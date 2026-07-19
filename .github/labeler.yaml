@@ -1,0 +1,72 @@
+version: 1
+labels:
+  # --- by PR "Type of change" checklist ---
+  - label: "feature"
+    body: '(?m)^\s*-\s*\[[xX]\]\s+\**Feature\b'
+  - label: "bug"
+    body: '(?m)^\s*-\s*\[[xX]\]\s+\**Bug fix\b'
+  - label: "enhancement"
+    body: '(?m)^\s*-\s*\[[xX]\]\s+\**Enhancement\b'
+  - label: "refactor"
+    body: '(?m)^\s*-\s*\[[xX]\]\s+\**Refactor\b'
+  - label: "breaking-change"
+    body: '(?m)^\s*-\s*\[[xX]\]\s+\**Breaking change\b'
+  - label: "security"
+    body: '(?m)^\s*-\s*\[[xX]\]\s+\**Security\b'
+
+  # --- by changed paths ---
+  - label: "docs"
+    files:
+      - "^docs/"
+      - '^README\.md$'
+  - label: "ci-cd"
+    files:
+      - '^\.github/'
+      - '^Taskfile\.yaml$'
+      - '^\.golangci\.yaml$'
+      - '^release-please-config\.json$'
+  - label: "tests"
+    files:
+      - '_test\.go$'
+      - "^collector/internal/store/storetest/"
+      - '\.test\.ts$'
+  - label: "dependencies"
+    files:
+      - '^collector/go\.(mod|sum)$'
+      - 'pnpm-lock\.yaml$'
+  - label: "collector"
+    files:
+      - "^collector/"
+  - label: "config"
+    files:
+      - "^collector/internal/config/"
+      - "^collector/internal/topology/"
+      - '^orrery\.example\.yaml$'
+  - label: "store"
+    files:
+      - "^collector/internal/store/"
+  - label: "poller"
+    files:
+      - "^collector/internal/poller/"
+  - label: "xray"
+    files:
+      - "^collector/internal/xray/"
+  - label: "ssh"
+    files:
+      - "^collector/internal/sshdial/"
+  - label: "api"
+    files:
+      - "^collector/internal/api/"
+  - label: "metrics"
+    files:
+      - "^collector/internal/promexp/"
+  - label: "dashboard"
+    files:
+      - "^dashboard/src/"
+      - "^dashboard/public/"
+      - '^dashboard/index\.html$'
+      - '^dashboard/vite\.config\.ts$'
+      - "^dashboard/tsconfig"
+  - label: "worker"
+    files:
+      - "^dashboard/worker/"

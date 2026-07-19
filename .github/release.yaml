@@ -1,0 +1,58 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+      - skip-changelog
+    authors:
+      - dependabot
+      - dependabot[bot]
+      - github-actions[bot]
+      - renovate[bot]
+
+  categories:
+    - title: 💥 Breaking Changes
+      labels:
+        - breaking-change
+    - title: ✨ Features & Enhancements
+      labels:
+        - feature
+        - enhancement
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+    - title: 🛰️ Collector
+      labels:
+        - collector
+        - poller
+        - xray
+        - ssh
+        - store
+        - config
+    - title: 🌐 API & Metrics
+      labels:
+        - api
+        - metrics
+    - title: 📊 Dashboard
+      labels:
+        - dashboard
+        - worker
+    - title: 🔒 Security
+      labels:
+        - security
+    - title: 🔧 CI
+      labels:
+        - ci-cd
+    - title: 📚 Documentation
+      labels:
+        - docs
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+    - title: 🧪 Testing
+      labels:
+        - tests
+    - title: 📝 Other
+      labels:
+        - "*"
