@@ -1,0 +1,35 @@
+# Repo-wide ignores. Language-specific rules live next to their code:
+# collector/.gitignore, dashboard/.gitignore, dashboard/worker/.gitignore.
+
+# Release artifacts - built by `task release`, published as GitHub release assets
+/dist/
+
+# go-task fingerprint state
+.task/
+
+# Runtime config and data (a live orrery.yaml holds the bearer token)
+orrery.yaml
+*.db
+*.db-wal
+*.db-shm
+
+# macOS - github/gitignore Global/macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Visual Studio Code - github/gitignore Global/VisualStudioCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains - github/gitignore Global/JetBrains
+.idea/
+*.iml
+*.iws
