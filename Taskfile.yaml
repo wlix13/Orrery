@@ -1,0 +1,168 @@
+# Task (go-task) - https://taskfile.dev
+# Install: brew install go-task  |  go install github.com/go-task/task/v3/cmd/task@latest
+# Or run without installing:     go run github.com/go-task/task/v3/cmd/task@latest <task>
+version: "3"
+
+vars:
+  # CI passes the tag: `task release VERSION=v1.2.3`.
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  GOFLAGS: -trimpath -ldflags "-s -w -X main.version={{.VERSION}}"
+  WEBUI: collector/internal/api/webui/dist
+  RELEASE_PLATFORMS: linux/amd64 linux/arm64
+  # Lint toolchain, pinned by the tool directives in collector/go.mod.
+  GOLANGCI: go tool golangci-lint
+  BETTERALIGN: go tool betteralign
+
+tasks:
+  default:
+    desc: List available tasks
+    silent: true
+    cmds:
+      - task --list
+
+  version:
+    desc: Print the version this build would stamp
+    silent: true
+    cmds:
+      - echo {{.VERSION}}
+
+  ci:
+    desc: Everything CI checks on a push - lint, tests, both build variants
+    cmds:
+      - task: lint
+      - task: test
+
+  all:
+    desc: Full build - dashboard, then collector with it embedded
+    cmds:
+      - task: dashboard
+      - task: build
+
+  build:
+    desc: Build ./dist/orrery (embeds whatever is currently in the webui dir)
+    dir: collector
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p ../dist
+      - go build {{.GOFLAGS}} -o ../dist/orrery ./cmd/orrery
+
+  build:nodashboard:
+    desc: Build ./dist/orrery-nodashboard - collector only, no embedded SPA
+    dir: collector
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p ../dist
+      - go build -tags nodashboard {{.GOFLAGS}} -o ../dist/orrery-nodashboard ./cmd/orrery
+
+  dashboard:
+    desc: Build the SPA and copy it into the collector for embedding
+    cmds:
+      - cd dashboard && pnpm install --frozen-lockfile && pnpm build
+      # Clear stale output but keep .gitkeep, which is what go:embed matches
+      # when no build has been copied in.
+      - find {{.WEBUI}} -mindepth 1 ! -name .gitkeep -delete
+      - cp -R dashboard/dist/. {{.WEBUI}}/
+    sources:
+      - dashboard/src/**/*
+      - dashboard/index.html
+      - dashboard/package.json
+      - dashboard/vite.config.ts
+    generates:
+      - "{{.WEBUI}}/index.html"
+
+  test:
+    desc: Go tests + typechecks + Worker tests
+    cmds:
+      - task: test:go
+      - task: typecheck
+      - task: test:worker
+
+  test:go:
+    desc: Go tests, plus a build and vet of the nodashboard variant
+    cmds:
+      - cd collector && go test ./...
+      # The nodashboard variant is a separate compilation of the api package.
+      - cd collector && go build -tags nodashboard ./... && go vet -tags nodashboard ./...
+
+  typecheck:
+    desc: TypeScript typecheck of the dashboard and the Worker
+    cmds:
+      # -b (not --noEmit alone): the root tsconfig is solution-style with
+      # `files: []`, so a plain `tsc --noEmit` typechecks exactly nothing.
+      - cd dashboard && pnpm install --frozen-lockfile && pnpm exec tsc -b --force
+      # Separate project: its own deps (workers-types) and tsconfig.
+      - cd dashboard/worker && pnpm install --frozen-lockfile && pnpm exec tsc --noEmit
+
+  test:worker:
+    desc: Worker unit tests (Cloudflare Access verification, proxying)
+    cmds:
+      - cd dashboard/worker && pnpm install --frozen-lockfile && pnpm test
+
+  lint:
+    desc: golangci-lint (standard set + wsl_v5, fatcontext, gocognit) + betteralign
+    dir: collector
+    cmds:
+      - "{{.GOLANGCI}} run ./..."
+      - "{{.GOLANGCI}} run --build-tags nodashboard ./internal/api/..."
+      - "{{.BETTERALIGN}} ./..."
+
+  lint:fix:
+    desc: Apply lint autofixes and struct realignment
+    dir: collector
+    cmds:
+      - "{{.GOLANGCI}} run --fix ./..."
+      - "{{.BETTERALIGN}} -apply ./..."
+
+  release:
+    desc: Build release artifacts into dist/ - static binaries + SHA256SUMS
+    cmds:
+      - task: dashboard
+      - mkdir -p dist
+      - task: release:binaries
+      - task: release:checksums
+      - ls -l dist
+
+  release:binaries:
+    internal: true
+    # deps run concurrently, so the four targets cross-compile in parallel.
+    deps:
+      - task: xbuild
+        vars: { GOOS: linux, GOARCH: amd64 }
+      - task: xbuild
+        vars: { GOOS: linux, GOARCH: arm64 }
+      - task: xbuild
+        vars: { GOOS: linux, GOARCH: amd64, TAGS: nodashboard }
+      - task: xbuild
+        vars: { GOOS: linux, GOARCH: arm64, TAGS: nodashboard }
+
+  xbuild:
+    internal: true
+    dir: collector
+    env:
+      CGO_ENABLED: "0"
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+    vars:
+      SUFFIX: '{{if .TAGS}}-{{.TAGS}}{{end}}'
+    cmds:
+      - go build {{if .TAGS}}-tags {{.TAGS}}{{end}} {{.GOFLAGS}} -o ../dist/orrery-{{.GOOS}}-{{.GOARCH}}{{.SUFFIX}} ./cmd/orrery
+
+  release:checksums:
+    internal: true
+    dir: dist
+    cmds:
+      - rm -f SHA256SUMS
+      - >-
+        if command -v sha256sum >/dev/null 2>&1;
+        then sha256sum orrery-linux-*;
+        else shasum -a 256 orrery-linux-*;
+        fi > SHA256SUMS
+
+  clean:
+    desc: Remove all build artifacts
+    cmds:
+      - rm -rf dist dashboard/dist
+      - find {{.WEBUI}} -mindepth 1 ! -name .gitkeep -delete
