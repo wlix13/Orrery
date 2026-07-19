@@ -1,0 +1,53 @@
+listen: "127.0.0.1:9800"        # keep loopback; expose via CF Tunnel / reverse proxy
+auth:
+  # Each token is a principal. Omit fleets for access to every fleet.
+  tokens:
+    - name: ops
+      token: "${ORRERY_TOKEN}"  # env-expanded
+    - name: prometheus
+      token: "${ORRERY_SCRAPE_TOKEN}"
+      fleets: [main]
+  # allow_anonymous: true       # serve unauthenticated instead of any token
+db: /var/lib/orrery/orrery.db
+# db: "mongodb://user:pass@localhost:27017/orrery"   # optional MongoDB backend
+
+poll:
+  interval: 60s
+  timeout: 15s
+
+retention:
+  minute: 72h                   # minute-resolution buckets
+  hour: 2160h                   # hour-resolution buckets (90 days)
+
+metrics:
+  enabled: false                 # Prometheus text at /metrics (same bearer token)
+
+dashboard:
+  enabled: true                  # serve the embedded SPA at / (inert in -tags nodashboard builds)
+
+# SSH host-key verification:
+#   known_hosts - match against known_hosts file
+#   sshfp       - match key fingerprint against node's DNS SSHFP records
+#   insecure    - accept any host key (not recommended for production)
+host_key_verify: sshfp
+sshfp_require_dnssec: true
+
+fleets:
+  - name: main
+    topology: /etc/orrery/topology.yaml
+    xray_api_port: 10085        # api.listen port inside each node
+    dial: ssh                   # ssh (tunnel to loopback) | direct (open firewall port)
+    ssh:
+      user: orrery
+      key_file: /var/lib/orrery/.ssh/orrery_ed25519
+      port: 22
+      known_hosts: /var/lib/orrery/.ssh/known_hosts   # only used when host_key_verify: known_hosts
+    collect:
+      hub: full                 # tags + per-user traffic + online + sys
+      exit: traffic             # tags + sys only
+    # nodes:
+      # Per-node overrides (all fields optional, id must match topology):
+      # - id: hub01
+      #   collect: off
+      # - id: exit01
+      #   dial: direct
