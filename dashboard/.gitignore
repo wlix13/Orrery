@@ -1,0 +1,33 @@
+# Node / Vite - github/gitignore Node.gitignore
+
+# Dependency directories
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+dist-ssr/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Caches
+.npm
+.eslintcache
+.cache
+
+# dotenv environment variable files
+.env
+.env.*
+!.env.example
+
+# Local overrides and OS noise
+*.local
+.DS_Store

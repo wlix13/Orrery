@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+/* Dark is the default look; `.light` on <html> switches the palette.
+   Tailwind's `dark:` variant is driven off the same class so both directions
+   ("dark by default" and "explicit light toggle") work with one mechanism. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Original Orrery palette (kept after shell redesign). */
+  --color-bg: #0b0e14;
+  --color-surface: #11151f;
+  --color-surface-raised: #161b28;
+  --color-border: #232a3b;
+  --color-text: #e6e9f2;
+  --color-text-muted: #8892a8;
+  --color-text-faint: #5c6580;
+
+  --color-accent: #7c6cf0;
+  --color-accent-hover: #9384f5;
+  --color-accent-soft: #7c6cf026;
+
+  --color-up: #34d399;
+  --color-stale: #f5b64d;
+  --color-down: #f2545b;
+  --color-off: #5b6472;
+
+  --color-uplink: #7c6cf0;
+  --color-downlink: #2dd4c8;
+
+  --color-series-1: #7c6cf0;
+  --color-series-2: #2dd4c8;
+  --color-series-3: #f5b64d;
+  --color-series-4: #f2545b;
+  --color-series-5: #4d9bf5;
+  --color-series-6: #c96de0;
+  --color-series-7: #7fd453;
+  --color-series-8: #e0a56d;
+}
+
+:root:not(.light) {
+  color-scheme: dark;
+}
+
+:root.light {
+  color-scheme: light;
+  --color-bg: #f5f6fa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f0f1f6;
+  --color-border: #e2e4ec;
+  --color-text: #171a24;
+  --color-text-muted: #5b6478;
+  --color-text-faint: #8891a5;
+
+  --color-accent: #6857e8;
+  --color-accent-hover: #5646d6;
+  --color-accent-soft: #6857e81a;
+
+  --color-up: #109868;
+  --color-stale: #b3790a;
+  --color-down: #d8353d;
+  --color-off: #8a93a3;
+
+  --color-uplink: #6857e8;
+  --color-downlink: #0d9c90;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Soft dome wash — kept quiet so the palette doesn’t read neon. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse 80% 45% at 50% -15%,
+    color-mix(in srgb, var(--color-accent) 7%, transparent),
+    transparent 55%
+  );
+}
+
+:root.light body::before {
+  background: radial-gradient(
+    ellipse 70% 40% at 50% 0%,
+    color-mix(in srgb, var(--color-accent) 5%, transparent),
+    transparent 50%
+  );
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+.tabular-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.micro-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+@keyframes pulse-skeleton {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.skeleton {
+  animation: pulse-skeleton 1.6s ease-in-out infinite;
+  background-color: var(--color-border);
+  border-radius: 0.375rem;
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.brand-orbit {
+  animation: orbit-spin 18s linear infinite;
+}
+
+@keyframes nav-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.nav-item-active {
+  animation: nav-in 160ms ease-out;
+}
+
+.uplot {
+  font-family: var(--font-mono);
+}
