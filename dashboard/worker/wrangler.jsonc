@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "orrery-dashboard",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-01-01",
+
+  // Serves dashboard/dist (built by `pnpm build` from the parent directory).
+  "assets": {
+    "directory": "../dist",
+    // Exposes the asset fetcher to the Worker as env.ASSETS, used as the
+    // fallback for any request run_worker_first didn't already handle.
+    "binding": "ASSETS",
+    // SPA fallback: any path with no matching static file serves index.html
+    // instead of a 404, so client-side routes (e.g. /nodes/main/hub01) work
+    // on a hard refresh.
+    "not_found_handling": "single-page-application",
+    // Without this, /api/* would be swallowed by the SPA fallback above
+    // before ever reaching the Worker's fetch handler (there's no static
+    // file at /api/*, so it would 404 -> serve index.html). Forcing these
+    // paths through the Worker first lets it proxy them to the collector.
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Non-secret config. DASHBOARD_TOKEN, COLLECTOR_TOKEN and COLLECTOR_TOKENS
+  // are secrets, set via `wrangler secret put` - see README.md.
+  "vars": {
+    "COLLECTOR_URL": "https://example.invalid",
+    // Set both to verify Cloudflare Access assertions; leave empty to
+    // authenticate visitors with DASHBOARD_TOKEN alone.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  }
+}
