@@ -1,0 +1,59 @@
+# Dependabot only reads .github/dependabot.yml, so this is the one file in the
+# repo that keeps the .yml extension.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /collector
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      go:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /dashboard
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      dashboard:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /dashboard/worker
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      worker:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      docs:
+        patterns: ["*"]

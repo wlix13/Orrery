@@ -1,0 +1,7 @@
+# Marks this directory as its own pnpm workspace root so `pnpm install` here
+# doesn't get absorbed into the dashboard/ workspace one directory up.
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true

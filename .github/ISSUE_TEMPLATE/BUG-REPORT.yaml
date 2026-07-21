@@ -1,0 +1,55 @@
+name: "Bug report"
+description: "Found something that's not working as expected? Provide detailed information about the issue to help get it resolved."
+labels:
+  - bug
+
+body:
+  - id: description
+    type: textarea
+    validations:
+      required: true
+    attributes:
+      label: "Describe the bug"
+      description: "Tell what went wrong and how it's affecting your work."
+
+  - id: what-you-see
+    type: textarea
+    attributes:
+      label: "What do you see?"
+      description: "Share what's actually happening - collector logs, API responses, unexpected numbers, or missing nodes. Screenshots are welcome!"
+
+  - id: what-you-expect
+    type: textarea
+    attributes:
+      label: "What do you expect to see?"
+      description: "Describe the intended behavior - what should have happened instead?"
+
+  - id: steps-to-reproduce
+    type: textarea
+    validations:
+      required: false
+    attributes:
+      label: "List the steps that must be taken to reproduce this issue"
+      description: "Provide exact steps to recreate this bug. Include the relevant parts of `orrery.yaml` (with secrets redacted), commands used, and the API request if there is one. The easier it is to reproduce, the quicker it can be fixed!"
+      placeholder: |
+        1. Run `orrery -config orrery.yaml probe main/hub01`
+        2. Start the collector with `orrery -config orrery.yaml serve`
+        3. Request `GET /api/nodes` and observe unexpected output or error
+
+  - id: version
+    type: input
+    attributes:
+      label: "Version"
+      description: "Which version of Orrery are you using? (`orrery version`)"
+
+  - id: environment
+    type: textarea
+    attributes:
+      label: "Environment"
+      description: "Dial mode (`ssh` or `direct`), storage backend (sqlite or mongo), host-key verification mode, and how the collector is running (systemd, container, foreground)."
+
+  - id: additional-information
+    type: textarea
+    attributes:
+      label: "Additional information"
+      description: "Anything else that might help solve this? Environment details, related issues, or workarounds you've tried."

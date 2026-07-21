@@ -1,0 +1,97 @@
+# Core Labels
+- name: "bug"
+  description: "Something is not working"
+  color: "d73a4a"
+
+- name: "feature"
+  description: "New feature or request"
+  color: "a2eeef"
+
+- name: "enhancement"
+  description: "Improvement to existing functionality"
+  color: "0e8a16"
+
+- name: "docs"
+  description: "Documentation updates"
+  color: "0075ca"
+
+- name: "breaking-change"
+  description: "Breaking changes"
+  color: "b60205"
+
+- name: "collector"
+  description: "Collector binary & CLI"
+  color: "006b75"
+
+- name: "config"
+  description: "orrery.yaml loading, defaults & validation"
+  color: "1d76db"
+
+- name: "store"
+  description: "Storage contract & sqlite/mongo backends"
+  color: "fbca04"
+
+- name: "poller"
+  description: "Per-node polling & delta accounting"
+  color: "d4c5f9"
+
+- name: "xray"
+  description: "Xray gRPC stats client & vendored protos"
+  color: "bfd4f2"
+
+- name: "ssh"
+  description: "SSH dialing & host-key verification"
+  color: "bfdadc"
+
+- name: "api"
+  description: "HTTP JSON API, auth & scoping"
+  color: "c2e0c6"
+
+- name: "metrics"
+  description: "Prometheus exposition"
+  color: "c5def5"
+
+- name: "dashboard"
+  description: "Dashboard SPA"
+  color: "5319e7"
+
+- name: "worker"
+  description: "Cloudflare Workers dashboard"
+  color: "f9d0c4"
+
+- name: "security"
+  description: "Security-related changes"
+  color: "ee0701"
+
+- name: "refactor"
+  description: "Code refactoring"
+  color: "cccccc"
+
+- name: "tests"
+  description: "Testing"
+  color: "e99695"
+
+- name: "ci-cd"
+  description: "CI/CD and automation"
+  color: "0052cc"
+
+- name: "dependencies"
+  description: "Changes to dependencies"
+  color: "a569bd"
+
+- name: "automated"
+  description: "Automated changes (bots, scheduled workflows)"
+  color: "ededed"
+
+# PR Labels
+- name: "duplicate"
+  description: "This issue or PR already exists"
+  color: "cfd3d7"
+
+- name: "invalid"
+  description: "This doesn't seem right"
+  color: "e4e669"
+
+- name: "wontfix"
+  description: "This will not be worked on"
+  color: "ffffff"

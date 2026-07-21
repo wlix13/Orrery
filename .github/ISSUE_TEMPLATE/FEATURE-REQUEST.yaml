@@ -1,0 +1,31 @@
+name: "Feature request"
+description: "Have an idea that could improve this project? Share your suggestion and help shape the future development."
+labels:
+  - feature
+
+body:
+  - id: description
+    type: textarea
+    validations:
+      required: true
+    attributes:
+      label: "Describe the feature request"
+      description: "Describe the feature or improvement you'd like to see. Be as specific as possible about what it should do and how it should work."
+
+  - id: reason
+    type: textarea
+    attributes:
+      label: "Why would this feature be valuable?"
+      description: "Explain the problem this feature would solve or the benefit it would provide. Include use cases or scenarios where this would be helpful."
+
+  - id: usage-duration
+    type: input
+    attributes:
+      label: "How long have you been using this project?"
+      description: "This helps provide context for your request. Feel free to skip if you prefer not to answer."
+
+  - id: additional-information
+    type: textarea
+    attributes:
+      label: "Additional information"
+      description: "Any other details that might be relevant? Similar features in other tools, implementation ideas, or potential challenges to consider."

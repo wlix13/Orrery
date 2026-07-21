@@ -1,0 +1,93 @@
+name: 🔍 Check commit message in PR
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-commit-message:
+    name: 🔍 Check commit message in PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Check for fixup commits
+        uses: gsactions/commit-message-checker@16fa2d5de096ae0d35626443bcd24f1e756cafee # v2.0.0
+        with:
+          pattern: "^(?!fixup!).*$"
+          flags: "si"
+          excludeDescription: "true"
+          excludeTitle: "false"
+          checkAllCommitMessages: "true"
+          accessToken: ${{ secrets.GITHUB_TOKEN }}
+          error: |
+            Fixup commits are not allowed in pull requests.
+
+            Found commit message starting with "fixup!" which must be squashed before merging.
+
+            To squash fixup commits, use:
+              git rebase -i --autosquash origin/${{ github.event.pull_request.base.ref }}
+
+            Or manually squash the fixup commits with their target commits.
+
+            After squashing, force push the updated branch:
+              git push --force-with-lease origin ${{ github.event.pull_request.head.ref }}
+
+      - name: Check for Cyrillic characters
+        uses: gsactions/commit-message-checker@16fa2d5de096ae0d35626443bcd24f1e756cafee # v2.0.0
+        with:
+          pattern: "^[^А-Яа-яёЁ]*$"
+          flags: "si"
+          excludeDescription: "false"
+          excludeTitle: "false"
+          checkAllCommitMessages: "true"
+          accessToken: ${{ secrets.GITHUB_TOKEN }}
+          error: |
+            The commit message must contain only Latin characters.
+            Ensure there are no Cyrillic characters in the commit title or description.
+
+      - name: Check for conventional commit message
+        uses: gsactions/commit-message-checker@16fa2d5de096ae0d35626443bcd24f1e756cafee # v2.0.0
+        with:
+          pattern: '^((feat|fix|build|chore|ci|docs|refactor|perf|style|test|revert)(\([\w\/-]+\))?!?: [^\n]+(\n\n(BREAKING CHANGE: [^\n]+|.+))?)$'
+          flags: "si"
+          excludeDescription: "true"
+          excludeTitle: "true"
+          checkAllCommitMessages: "true"
+          accessToken: ${{ secrets.GITHUB_TOKEN }}
+          error: |
+            The commit message does not follow the conventional commit format.
+
+            A conventional commit message should be in the format:
+              <type>[optional scope]: <description>
+
+              [optional body]
+
+              [optional BREAKING CHANGE footer]
+
+            Example:
+              feat(api): add new endpoint
+
+            Or for a breaking change:
+              feat!: send an email to the customer
+
+              BREAKING CHANGE: `extends` key in config file is now used for extending other config files
+
+            Allowed types are: feat, fix, build, chore, ci, docs, refactor, perf, style, test, revert.
+            A '!' can be added after the type/scope for breaking changes (e.g., feat!:, feat(api)!:).
+            Alternatively, a 'BREAKING CHANGE:' footer can be used in the commit body.
+
+            Please rebase and amend the commit messages.
