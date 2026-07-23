@@ -58,6 +58,7 @@ task typecheck     # dashboard and Worker TypeScript
 task test:worker   # Worker unit tests
 task all           # build the dashboard, embed it, build ./dist/orrery
 task build:nodashboard   # collector-only binary, no embedded SPA
+task docs:dev      # serve the documentation site with live reload
 ```
 
 Run `task ci` before pushing.
@@ -82,7 +83,7 @@ Do not commit that output.
 ./dist/orrery -config orrery.yaml probe main/hub01
 ```
 
-`orrery.example.yaml` documents every setting.
+`orrery.example.yaml` documents every setting, and `docs/` carries the deployment guide and the full API contract.
 
 ## Commits
 

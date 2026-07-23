@@ -1,0 +1,73 @@
+---
+title: Orrery
+description: Xray metrics collection and visualization for the Conglomerate proxy fleet.
+template: splash
+hero:
+  tagline: One binary that polls every Xray node in your fleet, stores the traffic history and serves the API and dashboard over it.
+  actions:
+    - text: Get started
+      link: /Orrery/guides/getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/wlix13/Orrery
+      icon: external
+      variant: minimal
+---
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+An orrery is a mechanical model of the solar system.
+This one watches hubs (*perigee*) and exits (*aphelion*).
+
+It polls each node's Xray `StatsService`, stores traffic per tag and per user, and serves it back as a JSON API, a dashboard and an optional Prometheus endpoint.
+The dashboard ships inside the binary, or deploys to Cloudflare Workers against the same API.
+
+## Guides
+
+<CardGrid>
+  <LinkCard
+    title="Getting started"
+    href="/Orrery/guides/getting-started/"
+    description="One node from nothing to a chart, plus the command line."
+  />
+  <LinkCard
+    title="Xray stats configuration"
+    href="/Orrery/guides/xray-stats/"
+    description="The blocks each node needs before anything is collected."
+  />
+  <LinkCard
+    title="Deployment and operations"
+    href="/Orrery/guides/deployment/"
+    description="Running it as a service, exposing the dashboard, scoping access."
+  />
+  <LinkCard
+    title="Troubleshooting"
+    href="/Orrery/guides/troubleshooting/"
+    description="Common failures and which layer to fix."
+  />
+</CardGrid>
+
+## Reference
+
+<CardGrid>
+  <LinkCard
+    title="Configuration"
+    href="/Orrery/reference/configuration/"
+    description="Every orrery.yaml setting."
+  />
+  <LinkCard
+    title="HTTP API"
+    href="/Orrery/reference/api/"
+    description="Endpoints, parameters and response shapes."
+  />
+  <LinkCard
+    title="Ecosystem"
+    href="/Orrery/reference/ecosystem/"
+    description="The topology contract, and what Orrery leaves to other tools."
+  />
+  <LinkCard
+    title="Architecture"
+    href="/Orrery/reference/architecture/"
+    description="How polling, storage and the dashboard fit together."
+  />
+</CardGrid>

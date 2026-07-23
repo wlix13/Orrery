@@ -6,13 +6,14 @@
 ![Release](https://img.shields.io/github/v/release/wlix13/Orrery?logo=github)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Task](https://img.shields.io/badge/build-Task-29beb0?logo=task&logoColor=white)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-0075ca?logo=astro&logoColor=white)](https://wlix13.github.io/Orrery/)
 
 Metrics collection and dashboard for the **Conglomerate** proxy fleet.
 Polls every node's Xray `StatsService` over gRPC (through SSH tunnels or direct), stores traffic history in SQLite, and serves a JSON API, a web dashboard, and an optional Prometheus endpoint - all from one binary.
 
 An orrery is a mechanical model of the solar system; this one watches hubs (*perigee*) and exits (*aphelion*).
 
-```
+```text
 nodes (xray gRPC) ──ssh/direct──► orrery collector ──► SQLite
                                      │
                      ┌───────────────┼──────────────────┐
@@ -21,6 +22,10 @@ nodes (xray gRPC) ──ssh/direct──► orrery collector ──► SQLite
                        optional: Cloudflare Workers dashboard
 ```
 
+Full documentation: **<https://wlix13.github.io/Orrery/>**
+
+[Architecture and the API contract](https://wlix13.github.io/Orrery/reference/architecture/), [deployment and day-2 operations](https://wlix13.github.io/Orrery/guides/deployment/), [every config setting](https://wlix13.github.io/Orrery/reference/configuration/).
+
 ## Layout
 
 | Path | What |
@@ -28,10 +33,11 @@ nodes (xray gRPC) ──ssh/direct──► orrery collector ──► SQLite
 | `collector/` | Go collector: poller, SQLite store, HTTP API, embedded SPA |
 | `dashboard/` | Vite + React + Tailwind dashboard (uPlot charts) |
 | `dashboard/worker/` | Cloudflare Worker: serves the same SPA + API proxy |
+| `docs/` | Astro + Starlight documentation site, published to GitHub Pages |
 
 ## Quick start
 
-Prerequisites: nodes must expose Xray's stats API (`stats`, `api` and `policy` blocks).
+Prerequisites: nodes must expose Xray's stats API - see [Xray stats configuration](https://wlix13.github.io/Orrery/guides/xray-stats/).
 
 ```bash
 task all                      # build SPA, embed it, build ./dist/orrery
@@ -64,6 +70,7 @@ task ci                       # everything CI checks: lint + tests + typechecks
 task test                     # go tests + typechecks + worker tests
 task lint                     # golangci-lint (wsl_v5, fatcontext, gocognit + std) + betteralign
 task lint:fix                 # apply autofixes and struct realignment
+task docs:dev                 # documentation site with live reload
 cd dashboard && VITE_MOCK=1 pnpm dev   # dashboard against generated mock data
 ```
 

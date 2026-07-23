@@ -73,6 +73,20 @@ tasks:
     generates:
       - "{{.WEBUI}}/index.html"
 
+  docs:
+    desc: Build the documentation site into docs/dist
+    dir: docs
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm build
+
+  docs:dev:
+    desc: Serve the documentation site with live reload
+    dir: docs
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm dev
+
   test:
     desc: Go tests + typechecks + Worker tests
     cmds:
@@ -164,5 +178,5 @@ tasks:
   clean:
     desc: Remove all build artifacts
     cmds:
-      - rm -rf dist dashboard/dist
+      - rm -rf dist dashboard/dist docs/dist
       - find {{.WEBUI}} -mindepth 1 ! -name .gitkeep -delete
