@@ -4,6 +4,7 @@ package storetest
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ func Run(t *testing.T, open Factory) {
 	}{
 		{"SeriesMinuteAndAgg", testSeriesMinuteAndAgg},
 		{"SeriesHourTable", testSeriesHourTable},
+		{"SeriesRejectsBadParams", testSeriesRejectsBadParams},
 		{"OnlineLifecycle", testOnlineLifecycle},
 		{"UsersHubOnly", testUsersHubOnly},
 		{"RegisterNodesPrunes", testRegisterNodesPrunes},
@@ -166,6 +168,25 @@ func testSeriesHourTable(t *testing.T, s store.Store) {
 	// Both minute-polls land in the same hour bucket: 700+300.
 	if len(series) != 1 || series[0].Points[0] != 1000 {
 		t.Fatalf("hour series = %+v, want [1000 0]", series)
+	}
+}
+
+// Rejected parameters must be tagged ErrBadQuery: the API echoes only those.
+func testSeriesRejectsBadParams(t *testing.T, s store.Store) {
+	from := now.Unix()
+
+	bad := map[string]SeriesParams{
+		"empty range": {From: from, To: from, Step: 60, Kind: "inbound", Scope: store.AllFleets()},
+		"too wide":    {From: from, To: from + (store.MaxSlots+1)*60, Step: 60, Kind: "inbound", Scope: store.AllFleets()},
+		"invalid agg": {From: from, To: from + 600, Step: 60, Kind: "inbound", Agg: "sideways", Scope: store.AllFleets()},
+		"zero step":   {From: from, To: from + 600, Step: 0, Kind: "inbound", Scope: store.AllFleets()},
+	}
+
+	for name, p := range bad {
+		_, err := s.Series(context.Background(), p)
+		if !errors.Is(err, store.ErrBadQuery) {
+			t.Errorf("%s: err = %v, want ErrBadQuery", name, err)
+		}
 	}
 }
 

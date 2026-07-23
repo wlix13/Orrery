@@ -6,6 +6,7 @@ package promexp
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/wlix13/orrery/collector/internal/store"
@@ -14,19 +15,25 @@ import (
 
 // Handler renders metrics from the store. status derives the health label
 // (the API layer owns that logic; injected to avoid an import cycle).
-func Handler(st store.Store, status func(store.NodeStatus) string, scope func(*http.Request) store.Scope) http.Handler {
+func Handler(st store.Store, log *slog.Logger, status func(store.NodeStatus) string, scope func(*http.Request) store.Scope) http.Handler {
+	// A store failure quotes the database it could not reach.
+	fail := func(w http.ResponseWriter, err error) {
+		log.Error("metrics error", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sc := scope(r)
 
 		nodes, err := st.NodeStatuses(r.Context(), sc)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fail(w, err)
 			return
 		}
 
 		counters, err := st.Counters(r.Context(), sc)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fail(w, err)
 			return
 		}
 

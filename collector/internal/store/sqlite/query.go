@@ -36,6 +36,10 @@ func scopeCond(alias string, sc Scope) (cond string, args []any, ok bool) {
 }
 
 func (s *Store) Series(ctx context.Context, p SeriesParams) ([]Series, error) {
+	if p.Step <= 0 {
+		return nil, fmt.Errorf("%w: step must be positive", errBadQuery)
+	}
+
 	p.From -= p.From % p.Step
 	if rem := p.To % p.Step; rem != 0 {
 		p.To += p.Step - rem
@@ -43,11 +47,11 @@ func (s *Store) Series(ctx context.Context, p SeriesParams) ([]Series, error) {
 
 	slots := (p.To - p.From) / p.Step
 	if slots <= 0 {
-		return nil, fmt.Errorf("empty range")
+		return nil, fmt.Errorf("%w: empty range", errBadQuery)
 	}
 
 	if slots > maxSlots {
-		return nil, fmt.Errorf("range/step yields %d slots (max %d)", slots, maxSlots)
+		return nil, fmt.Errorf("%w: range/step yields %d slots (max %d)", errBadQuery, slots, maxSlots)
 	}
 
 	if p.Kind == "online" {
@@ -71,7 +75,7 @@ func (s *Store) Series(ctx context.Context, p SeriesParams) ([]Series, error) {
 	case AggTotal:
 		groupCols = ", t.dir"
 	default:
-		return nil, fmt.Errorf("invalid agg %q", p.Agg)
+		return nil, fmt.Errorf("%w: invalid agg %q", errBadQuery, p.Agg)
 	}
 
 	conds := []string{"t.bucket >= ?", "t.bucket < ?", "t.kind = ?"}

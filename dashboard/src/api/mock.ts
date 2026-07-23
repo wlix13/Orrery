@@ -225,7 +225,7 @@ function lastOkErr(n: MockNode, nowSeconds: number): { last_ok: number | null; l
   }
   return {
     last_ok: nowSeconds - (600 + (seed % 1800)),
-    last_err: "dial ssh: connect: connection refused",
+    last_err: "node unreachable",
   };
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"slices"
 	"strconv"
@@ -323,7 +324,13 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 
 	series, err := s.store.Series(r.Context(), p)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_query", err.Error())
+		if errors.Is(err, store.ErrBadQuery) {
+			writeErr(w, http.StatusBadRequest, "bad_query", err.Error())
+			return
+		}
+
+		s.internalErr(w, err)
+
 		return
 	}
 
