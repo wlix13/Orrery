@@ -1,11 +1,45 @@
 package poller
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/wlix13/orrery/collector/internal/xray"
 )
+
+func TestPollReasonHidesAddresses(t *testing.T) {
+	// gRPC inlines the whole dial chain, node address included, in its message.
+	unavailable := fmt.Errorf("QueryStats: %w", status.Error(codes.Unavailable,
+		"connection error: desc = transport: Error while dialing ssh dial 203.0.113.7:22: connect: connection refused"))
+
+	tests := map[string]struct {
+		err  error
+		want string
+	}{
+		"dial failure":  {unavailable, "node unreachable"},
+		"rpc deadline":  {fmt.Errorf("QueryStats: %w", status.Error(codes.DeadlineExceeded, "ctx")), "xray api timed out"},
+		"rpc denied":    {fmt.Errorf("QueryStats: %w", status.Error(codes.PermissionDenied, "denied")), "xray api refused the request"},
+		"rpc no method": {fmt.Errorf("QueryStats: %w", status.Error(codes.Unimplemented, "nope")), "xray api method unsupported"},
+		"plain error":   {errors.New("grpc client for 203.0.113.7:10085: bad target"), "poll failed"},
+	}
+
+	for name, tc := range tests {
+		got := pollReason(tc.err)
+		if got != tc.want {
+			t.Errorf("%s: pollReason = %q, want %q", name, got, tc.want)
+		}
+
+		if strings.Contains(got, "203.0.113.7") {
+			t.Errorf("%s: reason %q leaks the node address", name, got)
+		}
+	}
+}
 
 func TestBuildSampleDeltas(t *testing.T) {
 	ts := time.Unix(1_700_000_000, 0)

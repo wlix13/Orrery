@@ -9,6 +9,9 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/wlix13/orrery/collector/internal/config"
 	"github.com/wlix13/orrery/collector/internal/store"
 	"github.com/wlix13/orrery/collector/internal/xray"
@@ -92,7 +95,7 @@ func (p *Poller) poll(ctx context.Context) {
 	if p.client == nil {
 		client, err := xray.New(p.target.Addr, p.target.Dial)
 		if err != nil {
-			p.fail(ctx, err)
+			p.fail(ctx, err, "poll failed")
 			return
 		}
 
@@ -105,7 +108,7 @@ func (p *Poller) poll(ctx context.Context) {
 		// for SSH, lets the dialer re-establish the tunnel).
 		p.client.Close()
 		p.client = nil
-		p.fail(ctx, err)
+		p.fail(ctx, err, pollReason(err))
 
 		return
 	}
@@ -136,17 +139,34 @@ func (p *Poller) poll(ctx context.Context) {
 	}
 
 	if err := p.store.WriteSample(ctx, smp); err != nil {
-		p.fail(ctx, err)
+		p.fail(ctx, err, "storage write failed")
 		return
 	}
 
 	p.last = smp.Counters
 }
 
-func (p *Poller) fail(ctx context.Context, err error) {
-	p.log.Warn("poll failed", "err", err)
+// pollReason labels a failed RPC; the error itself quotes the node's address.
+func pollReason(err error) string {
+	switch status.Code(err) {
+	case codes.Unavailable:
+		return "node unreachable"
+	case codes.DeadlineExceeded:
+		return "xray api timed out"
+	case codes.Unauthenticated, codes.PermissionDenied:
+		return "xray api refused the request"
+	case codes.Unimplemented:
+		return "xray api method unsupported"
+	default:
+		return "poll failed"
+	}
+}
+
+// fail logs the error and stores only the label, which the API serves.
+func (p *Poller) fail(ctx context.Context, err error, reason string) {
+	p.log.Warn("poll failed", "reason", reason, "err", err)
 	// Best-effort: the parent ctx may already be cancelled on shutdown.
-	if mErr := p.store.MarkNodeError(context.WithoutCancel(ctx), p.target.Node.Key, err.Error(), time.Now()); mErr != nil {
+	if mErr := p.store.MarkNodeError(context.WithoutCancel(ctx), p.target.Node.Key, reason, time.Now()); mErr != nil {
 		p.log.Error("record poll error", "err", mErr)
 	}
 }

@@ -64,6 +64,7 @@ type Store interface {
 	// into minute+hour buckets, node health, and the online snapshot.
 	WriteSample(ctx context.Context, smp Sample) error
 	// MarkNodeError records a failed poll without touching traffic data.
+	// msg is a label, never error text: API clients are served it verbatim.
 	MarkNodeError(ctx context.Context, nodeKey, msg string, ts time.Time) error
 	// Retention deletes buckets older than the configured windows.
 	Retention(ctx context.Context, minute, hour time.Duration) error
@@ -110,8 +111,8 @@ type Node struct {
 // NodeStatus is a node row with its live health snapshot.
 type NodeStatus struct {
 	Node
-	LastErr      string
-	LastOK       int64 // unix seconds of last successful poll, 0 = never
+	LastErr      string // failure label, see MarkNodeError
+	LastOK       int64  // unix seconds of last successful poll, 0 = never
 	LastErrTS    int64
 	UptimeS      int64
 	NumGoroutine int64
