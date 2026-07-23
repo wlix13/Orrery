@@ -224,6 +224,10 @@ func (s *Store) NodeTotals(ctx context.Context, nodeKey string, from, to int64) 
 
 // Series returns dense arrays aligned to From + i*Step.
 func (s *Store) Series(ctx context.Context, p store.SeriesParams) ([]store.Series, error) {
+	if p.Step <= 0 {
+		return nil, fmt.Errorf("%w: step must be positive", store.ErrBadQuery)
+	}
+
 	p.From -= p.From % p.Step
 	if rem := p.To % p.Step; rem != 0 {
 		p.To += p.Step - rem
@@ -231,18 +235,24 @@ func (s *Store) Series(ctx context.Context, p store.SeriesParams) ([]store.Serie
 
 	slots := (p.To - p.From) / p.Step
 	if slots <= 0 {
-		return nil, fmt.Errorf("empty range")
+		return nil, fmt.Errorf("%w: empty range", store.ErrBadQuery)
 	}
 
 	if slots > store.MaxSlots {
-		return nil, fmt.Errorf("range/step yields %d slots (max %d)", slots, store.MaxSlots)
+		return nil, fmt.Errorf("%w: range/step yields %d slots (max %d)", store.ErrBadQuery, slots, store.MaxSlots)
 	}
 
 	if p.Kind == "online" {
 		return s.onlineSeries(ctx, p, slots)
 	}
 
-	return s.trafficSeries(ctx, p, slots)
+	// Built up front so a bad agg is rejected whether or not any node matches.
+	groupID, err := seriesGroupID(p.From, p.Step, p.Agg)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.trafficSeries(ctx, p, slots, groupID)
 }
 
 // slotExpr builds the $floor((bucket-from)/step) expression shared by both
@@ -270,11 +280,11 @@ func seriesGroupID(from, step int64, agg string) (bson.D, error) {
 	case store.AggTotal:
 		return bson.D{slot, dir}, nil
 	default:
-		return nil, fmt.Errorf("invalid agg %q", agg)
+		return nil, fmt.Errorf("%w: invalid agg %q", store.ErrBadQuery, agg)
 	}
 }
 
-func (s *Store) trafficSeries(ctx context.Context, p store.SeriesParams, slots int64) ([]store.Series, error) {
+func (s *Store) trafficSeries(ctx context.Context, p store.SeriesParams, slots int64, groupID bson.D) ([]store.Series, error) {
 	if p.Scope.Empty() {
 		return nil, nil
 	}
@@ -287,11 +297,6 @@ func (s *Store) trafficSeries(ctx context.Context, p store.SeriesParams, slots i
 	allowed := filterNodeKeys(nodes, p.Scope, p.Type, p.Node)
 	if len(allowed) == 0 {
 		return nil, nil
-	}
-
-	groupID, err := seriesGroupID(p.From, p.Step, p.Agg)
-	if err != nil {
-		return nil, err
 	}
 
 	match := bson.D{

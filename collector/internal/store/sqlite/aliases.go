@@ -29,3 +29,5 @@ const (
 	AggTotal  = store.AggTotal
 	maxSlots  = store.MaxSlots
 )
+
+var errBadQuery = store.ErrBadQuery

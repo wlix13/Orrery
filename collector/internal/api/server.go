@@ -49,7 +49,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Same auth as /api: metrics expose per-node and per-user traffic volumes.
 	if s.cfg.Metrics.Enabled {
-		mux.Handle("GET /metrics", s.auth(promexp.Handler(s.store, s.nodeStatus, func(r *http.Request) store.Scope {
+		mux.Handle("GET /metrics", s.auth(promexp.Handler(s.store, s.log, s.nodeStatus, func(r *http.Request) store.Scope {
 			return principalOf(r.Context()).Scope
 		})))
 	}

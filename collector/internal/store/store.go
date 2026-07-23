@@ -7,10 +7,14 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/wlix13/orrery/collector/internal/xray"
 )
+
+// ErrBadQuery marks query parameters a backend refuses; the API echoes only these.
+var ErrBadQuery = errors.New("bad query")
 
 // Scope limits a read to a set of fleets. The zero value matches nothing, so
 // a caller that forgets to set it sees no data rather than all of it; use
