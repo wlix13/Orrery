@@ -1,0 +1,12 @@
+{
+  "name": "orrery",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint:md": "markdownlint-cli2",
+    "lint:md:fix": "markdownlint-cli2 --fix"
+  },
+  "devDependencies": {
+    "markdownlint-cli2": "^0.23.1"
+  }
+}

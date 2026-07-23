@@ -66,10 +66,13 @@ See [dashboard/worker/README.md](dashboard/worker/README.md).
 ## Development
 
 ```bash
-task ci                       # everything CI checks: lint + tests + typechecks
+task ci                       # lint + tests + typechecks, as CI runs them
 task test                     # go tests + typechecks + worker tests
-task lint                     # golangci-lint (wsl_v5, fatcontext, gocognit + std) + betteralign
-task lint:fix                 # apply autofixes and struct realignment
+task lint                     # lint:go + lint:md
+task lint:go                  # golangci-lint (wsl_v5, fatcontext, gocognit + std) + betteralign
+task lint:md                  # markdownlint-cli2 over every Markdown file
+task lint:fix                 # apply autofixes, struct realignment and Markdown fixes
+task docs                     # build the documentation site, as CI does for docs/ changes
 task docs:dev                 # documentation site with live reload
 cd dashboard && VITE_MOCK=1 pnpm dev   # dashboard against generated mock data
 ```

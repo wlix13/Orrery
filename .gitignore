@@ -7,6 +7,10 @@
 # go-task fingerprint state
 .task/
 
+# Root node deps - the markdown linter and nothing else
+/node_modules/
+.pnpm-store/
+
 # Runtime config and data (a live orrery.yaml holds the bearer token)
 orrery.yaml
 *.db
