@@ -1,0 +1,14 @@
+{
+  "name": "orrery-docs",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.3",
+    "astro": "^7.1.1"
+  }
+}

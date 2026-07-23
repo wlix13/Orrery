@@ -24,6 +24,7 @@ labels:
       - '^\.github/'
       - '^Taskfile\.yaml$'
       - '^\.golangci\.yaml$'
+      - '^\.markdownlint-cli2\.jsonc$'
       - '^release-please-config\.json$'
   - label: "tests"
     files:

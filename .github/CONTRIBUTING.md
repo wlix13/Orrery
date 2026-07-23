@@ -50,18 +50,23 @@ go run github.com/go-task/task/v3/cmd/task@latest <task>
 
 ```bash
 task ci            # everything CI checks, in one run: lint + tests + typechecks
-task lint          # golangci-lint (both build variants) + betteralign
-task lint:fix      # apply lint autofixes and struct realignment
+task lint          # lint:go + lint:md
+task lint:go       # golangci-lint (both build variants) + betteralign
+task lint:md       # markdownlint-cli2 over every Markdown file
+task lint:fix      # apply lint autofixes, struct realignment and Markdown fixes
 task test          # test:go + typecheck + test:worker
 task test:go       # go test ./... + the nodashboard build and vet
 task typecheck     # dashboard and Worker TypeScript
 task test:worker   # Worker unit tests
 task all           # build the dashboard, embed it, build ./dist/orrery
 task build:nodashboard   # collector-only binary, no embedded SPA
+task docs          # build the documentation site
+task docs:dev      # serve the documentation site with live reload
 ```
 
 Run `task ci` before pushing.
 It is the same set of checks the pull request will run, just serially instead of across parallel jobs.
+`task ci` does not build the documentation site, so run `task docs` too when the change touches `docs/`.
 
 ### Working on the dashboard
 
@@ -82,7 +87,7 @@ Do not commit that output.
 ./dist/orrery -config orrery.yaml probe main/hub01
 ```
 
-`orrery.example.yaml` documents every setting.
+`orrery.example.yaml` documents every setting, and `docs/` carries the deployment guide and the full API contract.
 
 ## Commits
 

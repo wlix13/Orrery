@@ -73,6 +73,20 @@ tasks:
     generates:
       - "{{.WEBUI}}/index.html"
 
+  docs:
+    desc: Build the documentation site into docs/dist
+    dir: docs
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm build
+
+  docs:dev:
+    desc: Serve the documentation site with live reload
+    dir: docs
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm dev
+
   test:
     desc: Go tests + typechecks + Worker tests
     cmds:
@@ -102,6 +116,12 @@ tasks:
       - cd dashboard/worker && pnpm install --frozen-lockfile && pnpm test
 
   lint:
+    desc: All linters - Go and Markdown
+    cmds:
+      - task: lint:go
+      - task: lint:md
+
+  lint:go:
     desc: golangci-lint (standard set + wsl_v5, fatcontext, gocognit) + betteralign
     dir: collector
     cmds:
@@ -109,12 +129,30 @@ tasks:
       - "{{.GOLANGCI}} run --build-tags nodashboard ./internal/api/..."
       - "{{.BETTERALIGN}} ./..."
 
+  lint:md:
+    desc: markdownlint-cli2 over every Markdown file (see .markdownlint-cli2.jsonc)
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm exec markdownlint-cli2
+
   lint:fix:
-    desc: Apply lint autofixes and struct realignment
+    desc: Apply lint autofixes, struct realignment and Markdown fixes
+    cmds:
+      - task: lint:go:fix
+      - task: lint:md:fix
+
+  lint:go:fix:
+    internal: true
     dir: collector
     cmds:
       - "{{.GOLANGCI}} run --fix ./..."
       - "{{.BETTERALIGN}} -apply ./..."
+
+  lint:md:fix:
+    internal: true
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm exec markdownlint-cli2 --fix
 
   release:
     desc: Build release artifacts into dist/ - static binaries + SHA256SUMS
@@ -164,5 +202,5 @@ tasks:
   clean:
     desc: Remove all build artifacts
     cmds:
-      - rm -rf dist dashboard/dist
+      - rm -rf dist dashboard/dist docs/dist
       - find {{.WEBUI}} -mindepth 1 ! -name .gitkeep -delete

@@ -1,0 +1,22 @@
+# Astro / Node
+
+# Dependency directories
+node_modules/
+.pnpm-store/
+
+# Build output and Astro cache
+dist/
+.astro/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# dotenv environment variable files
+.env
+.env.*
+!.env.example
+
+# OS noise
+.DS_Store

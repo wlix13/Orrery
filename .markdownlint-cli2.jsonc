@@ -1,0 +1,21 @@
+{
+  "globs": ["**/*.md", "**/*.mdx"],
+  "gitignore": true,
+
+  // Generated, boilerplate and vendored - not authored to this style.
+  "ignores": [
+    "CHANGELOG.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+  ],
+
+  "config": {
+    "default": true,
+
+    // Prose is one sentence per line; tables pad cells but not the delimiter row.
+    "MD013": false,
+    "MD060": false,
+
+    // Starlight components in .mdx parse as inline HTML.
+    "MD033": false,
+  },
+}
