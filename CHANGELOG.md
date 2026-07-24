@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/wlix13/Orrery/compare/v0.1.0...v0.1.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **collector:** keep store errors out of api responses ([be00cdd](https://github.com/wlix13/Orrery/commit/be00cdd635085c0d6cb742adf9f836c02ba5926a))
+* **collector:** store poll failure label instead of error text ([89dfd62](https://github.com/wlix13/Orrery/commit/89dfd6220737fbaaa6a7994aa2053bb775eb0113))
+
 ## 0.1.0 (2026-07-22)
 
 
