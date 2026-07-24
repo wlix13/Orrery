@@ -101,3 +101,16 @@ jobs:
 
       - name: Type check
         run: task typecheck
+
+  quality-gate:
+    name: ✅ Code quality passed
+    if: always()
+    needs: [go, markdown, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any quality job did not pass
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::one or more code quality jobs failed or were cancelled"
+          exit 1
