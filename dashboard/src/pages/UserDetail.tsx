@@ -206,7 +206,8 @@ export default function UserDetail({ email }: { email: string }) {
     },
     {
       key: "last_seen",
-      header: "Last seen",
+      // Xray stamps this when a connection opens and never refreshes it.
+      header: <span title="When the most recent connection from this IP opened">Connected</span>,
       align: "right",
       sort: (a, b) => a.last_seen - b.last_seen,
       render: (r) => formatRelativeTime(r.last_seen),
@@ -310,14 +311,24 @@ export default function UserDetail({ email }: { email: string }) {
             defaultSort={{ key: "down", dir: "desc" }}
           />
         </Panel>
-        <Panel title="Online IPs">
+        <Panel
+          title="Online IPs"
+          action={
+            <span
+              className="text-xs whitespace-nowrap text-text-faint"
+              title="Xray reports an IP only while it holds at least one open connection, so this list is not a history."
+            >
+              live sessions
+            </span>
+          }
+        >
           <DataTable
             columns={ipColumns}
             rows={detail.data?.ips ?? []}
             rowKey={(r) => `${r.node}|${r.ip}`}
             loading={detail.loading}
             error={detail.error}
-            emptyMessage="No active sessions."
+            emptyMessage="No open connections right now."
             defaultSort={{ key: "node", dir: "asc" }}
           />
         </Panel>
