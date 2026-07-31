@@ -170,6 +170,7 @@ export interface UserNodeBreakdown {
 }
 
 export interface OnlineIp {
+  node: NodeKey;
   ip: string;
   last_seen: number;
 }

@@ -7,7 +7,7 @@ import { useFleets } from "../lib/fleets";
 import { splitUserId } from "../lib/identity";
 import { windowForRange } from "../lib/range";
 import { formatBytes, formatRelativeTime } from "../lib/format";
-import type { Range, SeenWindow } from "../api/types";
+import type { OnlineIp, Range, SeenWindow } from "../api/types";
 import type { OrreryClient } from "../api/client";
 import { RangePicker } from "../components/RangePicker";
 import { SeenPicker } from "../components/SeenPicker";
@@ -115,6 +115,12 @@ export default function UserDetail({ email }: { email: string }) {
     return [...rows.values()];
   }, [detail.data]);
 
+  // One row per (hub, IP), so the same address on two hubs counts once here.
+  const distinctIPs = useMemo(
+    () => new Set(detail.data?.ips.map((r) => r.ip) ?? []).size,
+    [detail.data],
+  );
+
   const hubColumns: Column<HubRow>[] = [
     {
       key: "node",
@@ -164,7 +170,17 @@ export default function UserDetail({ email }: { email: string }) {
     },
   ];
 
-  const ipColumns: Column<{ ip: string; last_seen: number }>[] = [
+  const ipColumns: Column<OnlineIp>[] = [
+    {
+      key: "node",
+      header: "Hub",
+      sort: (a, b) => nodeLabel(a.node).localeCompare(nodeLabel(b.node)),
+      render: (r) => (
+        <Link href={nodeHref(r.node)} className="text-accent hover:underline">
+          {nodeLabel(r.node)}
+        </Link>
+      ),
+    },
     { key: "ip", header: "IP", sort: (a, b) => a.ip.localeCompare(b.ip), render: (r) => <span className="tabular-nums">{r.ip}</span> },
     {
       key: "last_seen",
@@ -236,7 +252,8 @@ export default function UserDetail({ email }: { email: string }) {
         <StatCard
           label="Active IPs"
           loading={detail.loading}
-          value={detail.data ? detail.data.ips.length : undefined}
+          value={detail.data ? distinctIPs : undefined}
+          sub={detail.data && detail.data.ips.length > distinctIPs ? `${detail.data.ips.length} hub sessions` : undefined}
         />
       </div>
 
@@ -268,18 +285,18 @@ export default function UserDetail({ email }: { email: string }) {
             loading={detail.loading}
             error={detail.error}
             emptyMessage="No hub activity in this range."
-            defaultSort={{ key: "last_seen", dir: "desc" }}
+            defaultSort={{ key: "down", dir: "desc" }}
           />
         </Panel>
         <Panel title="Online IPs">
           <DataTable
             columns={ipColumns}
             rows={detail.data?.ips ?? []}
-            rowKey={(r) => r.ip}
+            rowKey={(r) => `${r.node}|${r.ip}`}
             loading={detail.loading}
             error={detail.error}
             emptyMessage="No active sessions."
-            defaultSort={{ key: "last_seen", dir: "desc" }}
+            defaultSort={{ key: "node", dir: "asc" }}
           />
         </Panel>
       </div>
