@@ -5,6 +5,8 @@ import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { RANGE_KEY_USERS, useStoredRange } from "../lib/useStoredRange";
 import { useFleets } from "../lib/fleets";
 import { splitUserId } from "../lib/identity";
+import { ipScope } from "../lib/ip";
+import { IP_SCOPE_HELP, IP_SCOPE_LABEL } from "../lib/glossary";
 import { windowForRange } from "../lib/range";
 import { formatBytes, formatRelativeTime } from "../lib/format";
 import type { OnlineIp, Range, SeenWindow } from "../api/types";
@@ -181,7 +183,27 @@ export default function UserDetail({ email }: { email: string }) {
         </Link>
       ),
     },
-    { key: "ip", header: "IP", sort: (a, b) => a.ip.localeCompare(b.ip), render: (r) => <span className="tabular-nums">{r.ip}</span> },
+    {
+      key: "ip",
+      header: "IP",
+      sort: (a, b) => a.ip.localeCompare(b.ip),
+      render: (r) => {
+        const scope = ipScope(r.ip);
+        return (
+          <span className="flex items-center gap-1.5">
+            <span className="tabular-nums">{r.ip}</span>
+            {scope !== null && (
+              <span
+                className="shrink-0 rounded bg-surface-raised px-1 py-0.5 font-mono text-[0.65rem] text-text-faint"
+                title={IP_SCOPE_HELP[scope]}
+              >
+                {IP_SCOPE_LABEL[scope]}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
     {
       key: "last_seen",
       header: "Last seen",

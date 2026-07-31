@@ -133,8 +133,19 @@ function isUserOnline(email: string, nowSeconds: number): boolean {
   return pseudoRandom(hashStr(email), bucket) > 0.35;
 }
 
+// A WireGuard inbound reports the peer's tunnel address, which is fixed per
+// peer - so this identity shows the same private IP on every hub.
+const WIREGUARD_IPS: Record<string, string> = {
+  "amelia-server@amelia": "10.7.0.12",
+};
+
 function userIps(email: string, nowSeconds: number, node: string): OnlineIp[] {
   const seed = hashStr(`${email}@${node}`);
+  const tunnel = WIREGUARD_IPS[email];
+  if (tunnel) {
+    return [{ node, ip: tunnel, last_seen: nowSeconds - Math.floor(pseudoRandom(seed, 10) * 120) }];
+  }
+
   const count = 1 + Math.floor(pseudoRandom(seed, 2) * 2); // 1-2 IPs
   const ips: OnlineIp[] = [];
   for (let i = 0; i < count; i++) {
