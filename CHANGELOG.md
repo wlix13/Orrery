@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.2](https://github.com/wlix13/Orrery/compare/v0.1.1...v0.1.2) (2026-08-01)
+
+
+### Features
+
+* **dashboard:** mark non-routable online IPs ([7338d42](https://github.com/wlix13/Orrery/commit/7338d42d3c37c83a46d3dae6e03581287910d8dd))
+* **dashboard:** show on which hub each online IP was seen ([dda26be](https://github.com/wlix13/Orrery/commit/dda26beb2995bfeda15d9fcc514cbd2fcd6a7beb))
+
+
+### Bug Fixes
+
+* **collector:** scope user IP lookups to caller's fleets ([f3831ac](https://github.com/wlix13/Orrery/commit/f3831ac535b935e860640f76fafb4263f845cf0b))
+* **dashboard:** update what exactly online IP list means ([9279360](https://github.com/wlix13/Orrery/commit/9279360c6a05fb144031baf19e51c5f0786b695c))
+
 ## [0.1.1](https://github.com/wlix13/Orrery/compare/v0.1.0...v0.1.1) (2026-07-24)
 
 
