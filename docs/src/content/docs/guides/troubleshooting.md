@@ -119,6 +119,19 @@ Charts pick the resolution that fits the requested range, so a 30-day chart keep
 Its collect level is `off`.
 It is registered and visible but never polled.
 
+### An active user shows no online IPs
+
+Xray tracks online addresses by open connection: an address appears when a connection opens and disappears when the last one closes.
+A client idling between requests holds nothing open, so it reads as offline with an empty IP list while its hub still shows recent traffic.
+`last_seen` on an entry is when its most recent connection opened, not when the last byte moved.
+An older Xray that answers only the presence call reports the identity as online with no addresses at all.
+
+### Online IPs are private addresses
+
+A WireGuard inbound reports the peer's tunnel address (`10.0.0.24`), not the public address its packets arrived from.
+That address comes from the peer's `AllowedIPs`, so it is fixed per peer and repeats on every hub the peer connects to.
+Other inbounds report the client's source address as the node saw it.
+
 ## Checking the collector itself
 
 ```bash

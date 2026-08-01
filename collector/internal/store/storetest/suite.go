@@ -418,6 +418,25 @@ func testScopeIsolatesLists(t *testing.T, s store.Store) {
 	if roamer.OnlineNow {
 		t.Error("online flag leaked presence from a fleet outside the scope")
 	}
+
+	// roamer is online only outside the scope, u@main only inside it.
+	_, _, _, ips, err := s.UserDetail(ctx, "roamer@ns", scopedWindow.from, scopedWindow.to, scopedWindow.from, main)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ips) != 0 {
+		t.Errorf("UserDetail = %+v, want no IPs (roamer is online on the other fleet)", ips)
+	}
+
+	_, _, _, ips, err = s.UserDetail(ctx, "u@main", scopedWindow.from, scopedWindow.to, scopedWindow.from, main)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ips) != 1 || ips[0].Node != "main/hub01" || ips[0].IP != "192.0.2.1" {
+		t.Errorf("UserDetail = %+v, want 192.0.2.1 on main/hub01", ips)
+	}
 }
 
 // testScopeIsolatesAggregates is the case post-filtering would fail: totals and

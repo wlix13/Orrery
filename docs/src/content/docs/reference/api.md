@@ -195,7 +195,7 @@ Parameters: `range`, `seen`.
 }
 ```
 
-`nodes` is traffic over the range, `seen_hubs` is presence over the `seen` window, and `ips` is the current snapshot with IP-less entries dropped.
+`nodes` is traffic over the range, `seen_hubs` is presence over the `seen` window, and `ips` is the live snapshot `/api/online` returns for this identity, with IP-less entries dropped.
 
 ### `GET /api/online`
 
@@ -208,6 +208,7 @@ Parameters: `fleet`.
 ```
 
 A snapshot refreshed each poll, not history.
+An entry exists only while its address holds at least one open connection, and `last_seen` is when the most recent of those connections opened.
 Only nodes collected at `full` contribute.
 
 ## Prometheus

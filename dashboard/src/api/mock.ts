@@ -133,18 +133,30 @@ function isUserOnline(email: string, nowSeconds: number): boolean {
   return pseudoRandom(hashStr(email), bucket) > 0.35;
 }
 
-function userIps(email: string, nowSeconds: number): OnlineIp[] {
-  const seed = hashStr(email);
+// A WireGuard inbound reports the peer's tunnel address, which is fixed per
+// peer - so this identity shows the same private IP on every hub.
+const WIREGUARD_IPS: Record<string, string> = {
+  "amelia-server@amelia": "10.7.0.12",
+};
+
+function userIps(email: string, nowSeconds: number, node: string): OnlineIp[] {
+  const seed = hashStr(`${email}@${node}`);
+  const tunnel = WIREGUARD_IPS[email];
+  if (tunnel) {
+    return [{ node, ip: tunnel, last_seen: nowSeconds - Math.floor(pseudoRandom(seed, 10) * 120) }];
+  }
+
   const count = 1 + Math.floor(pseudoRandom(seed, 2) * 2); // 1-2 IPs
   const ips: OnlineIp[] = [];
   for (let i = 0; i < count; i++) {
-    const octetSeed = hashStr(`${email}:${i}`);
+    const octetSeed = hashStr(`${email}@${node}:${i}`);
     // Unsigned shifts: hashStr can exceed 2^31, and `>>` yields negative octets.
     const a = 10 + (octetSeed % 50);
     const b = (octetSeed >>> 8) % 256;
     const c = (octetSeed >>> 16) % 256;
     const d = 1 + (octetSeed % 253);
     ips.push({
+      node,
       ip: `${a}.${b}.${c}.${d}`,
       last_seen: nowSeconds - Math.floor(pseudoRandom(seed, i + 10) * 120),
     });
@@ -545,7 +557,7 @@ export const mockClient: OrreryClient = {
       online_now: online,
       nodes,
       seen_hubs,
-      ips: online ? userIps(email, nowS) : [],
+      ips: online ? hubs.flatMap((h) => userIps(email, nowS, nodeKey(h))) : [],
     };
   },
 
@@ -555,7 +567,7 @@ export const mockClient: OrreryClient = {
     for (const n of NODES.filter((n) => n.type === "hub" && n.collect === "full")) {
       for (const email of USERS.filter((e) => userHubNodes(e).some((h) => nodeKey(h) === nodeKey(n)))) {
         if (!isUserOnline(email, nowS)) continue;
-        result.push({ node: nodeKey(n), email, ips: userIps(email, nowS) });
+        result.push({ node: nodeKey(n), email, ips: userIps(email, nowS, nodeKey(n)) });
       }
     }
     return result;

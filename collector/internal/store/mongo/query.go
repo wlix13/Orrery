@@ -946,7 +946,7 @@ func (s *Store) UserDetail(
 		seen = []store.UserHubSeen{}
 	}
 
-	ips, err := s.userIPRows(ctx, email)
+	ips, err := s.userIPRows(ctx, email, allowed)
 	if err != nil {
 		return store.DirTotal{}, nil, nil, nil, err
 	}
@@ -983,8 +983,11 @@ func decodeUserDetailTotals(ctx context.Context, cur *mongo.Cursor) (store.DirTo
 	return total, perNode, cur.Err()
 }
 
-func (s *Store) userIPRows(ctx context.Context, email string) ([]store.OnlineIPRow, error) {
-	filter := bson.D{{Key: "email", Value: email}}
+func (s *Store) userIPRows(ctx context.Context, email string, allowed []string) ([]store.OnlineIPRow, error) {
+	filter := bson.D{
+		{Key: "email", Value: email},
+		{Key: "node_key", Value: bson.D{{Key: "$in", Value: allowed}}},
+	}
 	opts := options.Find().SetSort(bson.D{{Key: "last_seen", Value: -1}})
 
 	cur, err := s.onlineCurrent.Find(ctx, filter, opts)

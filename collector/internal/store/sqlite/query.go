@@ -838,8 +838,10 @@ func (s *Store) UserDetail(ctx context.Context, email string, from, to, seenFrom
 	}
 
 	ipRows, err := s.db.QueryContext(ctx, `
-		SELECT node_key, ip, last_seen FROM online_current
-		WHERE email = ? ORDER BY last_seen DESC`, email)
+		SELECT oc.node_key, oc.ip, oc.last_seen FROM online_current oc
+		JOIN nodes n ON n.node_key = oc.node_key
+		WHERE oc.email = ?`+and+`
+		ORDER BY oc.last_seen DESC`, append([]any{email}, scopeArgs...)...)
 	if err != nil {
 		return DirTotal{}, nil, nil, nil, err
 	}

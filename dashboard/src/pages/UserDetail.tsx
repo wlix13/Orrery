@@ -5,9 +5,11 @@ import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { RANGE_KEY_USERS, useStoredRange } from "../lib/useStoredRange";
 import { useFleets } from "../lib/fleets";
 import { splitUserId } from "../lib/identity";
+import { ipScope } from "../lib/ip";
+import { IP_SCOPE_HELP, IP_SCOPE_LABEL } from "../lib/glossary";
 import { windowForRange } from "../lib/range";
 import { formatBytes, formatRelativeTime } from "../lib/format";
-import type { Range, SeenWindow } from "../api/types";
+import type { OnlineIp, Range, SeenWindow } from "../api/types";
 import type { OrreryClient } from "../api/client";
 import { RangePicker } from "../components/RangePicker";
 import { SeenPicker } from "../components/SeenPicker";
@@ -115,6 +117,12 @@ export default function UserDetail({ email }: { email: string }) {
     return [...rows.values()];
   }, [detail.data]);
 
+  // One row per (hub, IP), so the same address on two hubs counts once here.
+  const distinctIPs = useMemo(
+    () => new Set(detail.data?.ips.map((r) => r.ip) ?? []).size,
+    [detail.data],
+  );
+
   const hubColumns: Column<HubRow>[] = [
     {
       key: "node",
@@ -164,11 +172,42 @@ export default function UserDetail({ email }: { email: string }) {
     },
   ];
 
-  const ipColumns: Column<{ ip: string; last_seen: number }>[] = [
-    { key: "ip", header: "IP", sort: (a, b) => a.ip.localeCompare(b.ip), render: (r) => <span className="tabular-nums">{r.ip}</span> },
+  const ipColumns: Column<OnlineIp>[] = [
+    {
+      key: "node",
+      header: "Hub",
+      sort: (a, b) => nodeLabel(a.node).localeCompare(nodeLabel(b.node)),
+      render: (r) => (
+        <Link href={nodeHref(r.node)} className="text-accent hover:underline">
+          {nodeLabel(r.node)}
+        </Link>
+      ),
+    },
+    {
+      key: "ip",
+      header: "IP",
+      sort: (a, b) => a.ip.localeCompare(b.ip),
+      render: (r) => {
+        const scope = ipScope(r.ip);
+        return (
+          <span className="flex items-center gap-1.5">
+            <span className="tabular-nums">{r.ip}</span>
+            {scope !== null && (
+              <span
+                className="shrink-0 rounded bg-surface-raised px-1 py-0.5 font-mono text-[0.65rem] text-text-faint"
+                title={IP_SCOPE_HELP[scope]}
+              >
+                {IP_SCOPE_LABEL[scope]}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
     {
       key: "last_seen",
-      header: "Last seen",
+      // Xray stamps this when a connection opens and never refreshes it.
+      header: <span title="When the most recent connection from this IP opened">Connected</span>,
       align: "right",
       sort: (a, b) => a.last_seen - b.last_seen,
       render: (r) => formatRelativeTime(r.last_seen),
@@ -236,7 +275,8 @@ export default function UserDetail({ email }: { email: string }) {
         <StatCard
           label="Active IPs"
           loading={detail.loading}
-          value={detail.data ? detail.data.ips.length : undefined}
+          value={detail.data ? distinctIPs : undefined}
+          sub={detail.data && detail.data.ips.length > distinctIPs ? `${detail.data.ips.length} hub sessions` : undefined}
         />
       </div>
 
@@ -268,18 +308,28 @@ export default function UserDetail({ email }: { email: string }) {
             loading={detail.loading}
             error={detail.error}
             emptyMessage="No hub activity in this range."
-            defaultSort={{ key: "last_seen", dir: "desc" }}
+            defaultSort={{ key: "down", dir: "desc" }}
           />
         </Panel>
-        <Panel title="Online IPs">
+        <Panel
+          title="Online IPs"
+          action={
+            <span
+              className="text-xs whitespace-nowrap text-text-faint"
+              title="Xray reports an IP only while it holds at least one open connection, so this list is not a history."
+            >
+              live sessions
+            </span>
+          }
+        >
           <DataTable
             columns={ipColumns}
             rows={detail.data?.ips ?? []}
-            rowKey={(r) => r.ip}
+            rowKey={(r) => `${r.node}|${r.ip}`}
             loading={detail.loading}
             error={detail.error}
-            emptyMessage="No active sessions."
-            defaultSort={{ key: "last_seen", dir: "desc" }}
+            emptyMessage="No open connections right now."
+            defaultSort={{ key: "node", dir: "asc" }}
           />
         </Panel>
       </div>
