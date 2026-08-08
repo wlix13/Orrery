@@ -20,7 +20,8 @@ import (
 )
 
 type Store struct {
-	db *sql.DB
+	db        *sql.DB
+	writeGate chan struct{}
 }
 
 var _ store.Store = (*Store)(nil)
@@ -28,6 +29,7 @@ var _ store.Store = (*Store)(nil)
 func Open(path string) (*Store, error) {
 	dsn := "file:" + path + "?" + url.Values{
 		"_pragma": []string{"busy_timeout(5000)", "journal_mode(WAL)", "synchronous(NORMAL)"},
+		"_txlock": []string{"immediate"},
 	}.Encode()
 
 	db, err := sql.Open("sqlite", dsn)
@@ -42,10 +44,21 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
 
-	return &Store{db: db}, nil
+	return &Store{db: db, writeGate: make(chan struct{}, 1)}, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }
+
+func (s *Store) acquireWrite(ctx context.Context) error {
+	select {
+	case s.writeGate <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (s *Store) releaseWrite() { <-s.writeGate }
 
 const schema = `
 CREATE TABLE IF NOT EXISTS nodes (
@@ -115,6 +128,12 @@ CREATE TABLE IF NOT EXISTS online_current (
 
 // RegisterNodes reconciles the nodes table with the configured set.
 func (s *Store) RegisterNodes(ctx context.Context, nodes []Node) error {
+	if err := s.acquireWrite(ctx); err != nil {
+		return err
+	}
+
+	defer s.releaseWrite()
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -186,6 +205,12 @@ func (s *Store) LastCounters(ctx context.Context, nodeKey string) (map[string]in
 func (s *Store) WriteSample(ctx context.Context, smp Sample) error {
 	ts := smp.TS.Unix()
 	minute, hour := ts-ts%60, ts-ts%3600
+
+	if err := s.acquireWrite(ctx); err != nil {
+		return err
+	}
+
+	defer s.releaseWrite()
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -341,25 +366,73 @@ func (s *Store) MarkNodeError(ctx context.Context, nodeKey, msg string, ts time.
 		msg = msg[:500]
 	}
 
+	if err := s.acquireWrite(ctx); err != nil {
+		return err
+	}
+
+	defer s.releaseWrite()
+
 	_, err := s.db.ExecContext(ctx,
 		"UPDATE nodes SET last_err=?, last_err_ts=? WHERE node_key=?", msg, ts.Unix(), nodeKey)
 
 	return err
 }
 
+// Bucket span deleted per statement, so one sweep of large backlog is many
+// short locks instead of single long one.
+const (
+	sweepSpanMinute = 3600  // an hour of minute buckets
+	sweepSpanHour   = 86400 // a day of hour buckets
+)
+
 // Retention deletes buckets older than the configured windows.
 func (s *Store) Retention(ctx context.Context, minute, hour time.Duration) error {
 	now := time.Now().Unix()
-	for table, cutoff := range map[string]int64{
-		"traffic_minute":     now - int64(minute.Seconds()),
-		"online_user_minute": now - int64(minute.Seconds()),
-		"traffic_hour":       now - int64(hour.Seconds()),
-		"online_user_hour":   now - int64(hour.Seconds()),
+	for _, t := range []struct {
+		table  string
+		cutoff int64
+		span   int64
+	}{
+		{"traffic_minute", now - int64(minute.Seconds()), sweepSpanMinute},
+		{"online_user_minute", now - int64(minute.Seconds()), sweepSpanMinute},
+		{"traffic_hour", now - int64(hour.Seconds()), sweepSpanHour},
+		{"online_user_hour", now - int64(hour.Seconds()), sweepSpanHour},
 	} {
-		if _, err := s.db.ExecContext(ctx, "DELETE FROM "+table+" WHERE bucket < ?", cutoff); err != nil {
-			return fmt.Errorf("retention %s: %w", table, err)
+		for done := false; !done; {
+			var err error
+			if done, err = s.sweepChunk(ctx, t.table, t.cutoff, t.span); err != nil {
+				return fmt.Errorf("retention %s: %w", t.table, err)
+			}
 		}
 	}
 
 	return nil
+}
+
+// sweepChunk deletes up to span seconds of the oldest expired buckets and
+// reports whether the table is now clear.
+func (s *Store) sweepChunk(ctx context.Context, table string, cutoff, span int64) (bool, error) {
+	if err := s.acquireWrite(ctx); err != nil {
+		return false, err
+	}
+
+	defer s.releaseWrite()
+
+	var oldest sql.NullInt64
+	if err := s.db.QueryRowContext(ctx,
+		"SELECT MIN(bucket) FROM "+table+" WHERE bucket < ?", cutoff).Scan(&oldest); err != nil {
+		return false, err
+	}
+
+	if !oldest.Valid {
+		return true, nil
+	}
+
+	// Strictly above oldest, so every pass deletes something and MIN advances.
+	upper := min(oldest.Int64+span, cutoff)
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM "+table+" WHERE bucket < ?", upper); err != nil {
+		return false, err
+	}
+
+	return upper >= cutoff, nil
 }
