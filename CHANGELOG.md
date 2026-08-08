@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.0](https://github.com/wlix13/Orrery/compare/v0.1.2...v0.2.0) (2026-08-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **collector:** online_minute/online_hour tables replaced by online_user_minute/online_user_hour, which store one row per (bucket, node, email). Nothing reads the old tables
+
+### Features
+
+* **collector:** count online users by identity, not per node ([ed42e92](https://github.com/wlix13/Orrery/commit/ed42e920eca7efcbdc5a9b868d182b8190caa8d4))
+
+
+### Bug Fixes
+
+* **collector:** serialize sqlite writes instead of racing for the lock ([5eb643b](https://github.com/wlix13/Orrery/commit/5eb643be9d18b538d00e2b63a47461dea720ab90))
+* **dashboard:** chart online users across every hub ([207b4ac](https://github.com/wlix13/Orrery/commit/207b4ac7fd22a5a5c9976147a6175890829db8d0))
+
 ## [0.1.2](https://github.com/wlix13/Orrery/compare/v0.1.1...v0.1.2) (2026-08-01)
 
 
