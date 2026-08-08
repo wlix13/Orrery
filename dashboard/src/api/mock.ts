@@ -398,36 +398,27 @@ export const mockClient: OrreryClient = {
     let candidates = NODES.filter((n) => n.collect !== "off");
     if (node) candidates = candidates.filter((n) => nodeKey(n) === node);
     if (fleet) candidates = candidates.filter((n) => n.fleet === fleet);
+    if (type) candidates = candidates.filter((n) => n.type === type);
 
     if (kind === "online") {
-      // Only node/fleet filters apply; gauge count of online users per node.
-      const gaugePoints = (n: MockNode): number[] => {
-        const pts: number[] = [];
-        const hubUsers = USERS.filter((e) => userHubNodes(e).some((h) => nodeKey(h) === nodeKey(n)));
-        for (let t = from; t < to; t += step) {
-          const bucket = Math.floor(t / 300);
-          const count = hubUsers.filter((e) => pseudoRandom(hashStr(e), bucket) > 0.35).length;
-          pts.push(count);
-        }
-        return pts;
-      };
-      const hubCandidates = candidates.filter((n) => n.type === "hub");
-      if (node) {
-        const n = hubCandidates[0];
-        return { from, to, step, series: n ? [{ node: nodeKey(n), points: gaugePoints(n) }] : [] };
-      }
-      if (agg === "node") {
-        return { from, to, step, series: hubCandidates.map((n) => ({ node: nodeKey(n), points: gaugePoints(n) })) };
-      }
-      // total: sum across candidate hub nodes into a single line
-      const combined = hubCandidates.reduce<number[]>((acc, n) => {
-        const pts = gaugePoints(n);
-        return acc.length ? sumPoints(acc, pts) : pts;
-      }, []);
-      return { from, to, step, series: combined.length ? [{ points: combined }] : [] };
-    }
+      const slots: number[] = [];
+      for (let t = from; t < to; t += step) slots.push(Math.floor(t / 300));
 
-    if (type) candidates = candidates.filter((n) => n.type === type);
+      const onlineOn = (n: MockNode, bucket: number): string[] =>
+        USERS.filter(
+          (e) => userHubNodes(e).some((h) => nodeKey(h) === nodeKey(n)) && pseudoRandom(hashStr(e), bucket) > 0.35,
+        );
+
+      if (agg === "none" || agg === "node") {
+        const series = candidates
+          .map((n) => ({ node: nodeKey(n), points: slots.map((b) => onlineOn(n, b).length) }))
+          .filter((s) => s.points.some((p) => p > 0));
+        return { from, to, step, series };
+      }
+
+      const points = slots.map((b) => new Set(candidates.flatMap((n) => onlineOn(n, b))).size);
+      return { from, to, step, series: points.some((p) => p > 0) ? [{ points }] : [] };
+    }
 
     const dirs: Direction[] = dir ? [dir] : ["up", "down"];
 

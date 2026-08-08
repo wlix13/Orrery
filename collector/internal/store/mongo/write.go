@@ -5,7 +5,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/wlix13/orrery/collector/internal/store"
 	"github.com/wlix13/orrery/collector/internal/xray"
@@ -129,10 +128,11 @@ func (s *Store) writeNodeHealth(ctx context.Context, smp store.Sample, ts int64)
 	return err
 }
 
-// writeOnline replaces the node's online snapshot and updates the online
-// gauges. The prior rows are deleted before the fresh ones are inserted, so
-// a crash mid-step can leave the node's presence rows empty for one poll
-// but never stale (no user lingers as "online" past their last sighting).
+// writeOnline replaces the node's online snapshot and records presence into
+// the minute/hour buckets. The prior rows are deleted before the fresh ones
+// are inserted, so a crash mid-step can leave the node's presence rows empty
+// for one poll but never stale (no user lingers as "online" past their last
+// sighting).
 func (s *Store) writeOnline(ctx context.Context, smp store.Sample, ts, minute, hour int64) error {
 	if _, err := s.onlineCurrent.DeleteMany(ctx, bson.D{{Key: "node_key", Value: smp.NodeKey}}); err != nil {
 		return err
@@ -142,20 +142,42 @@ func (s *Store) writeOnline(ctx context.Context, smp store.Sample, ts, minute, h
 		return err
 	}
 
-	count := int64(len(smp.Online))
+	return s.writeOnlinePresence(ctx, smp, minute, hour)
+}
 
-	minuteFilter := bson.D{{Key: "bucket", Value: minute}, {Key: "node_key", Value: smp.NodeKey}}
-	minuteUpdate := bson.D{{Key: "$set", Value: bson.D{{Key: "count", Value: count}}}}
-
-	if _, err := s.onlineMinute.UpdateOne(ctx, minuteFilter, minuteUpdate, options.UpdateOne().SetUpsert(true)); err != nil {
-		return err
+// writeOnlinePresence records one doc per (bucket, node, email) so queries can
+// count distinct users across nodes instead of summing per-node gauges.
+func (s *Store) writeOnlinePresence(ctx context.Context, smp store.Sample, minute, hour int64) error {
+	if len(smp.Online) == 0 {
+		return nil
 	}
 
-	hourFilter := bson.D{{Key: "bucket", Value: hour}, {Key: "node_key", Value: smp.NodeKey}}
-	hourUpdate := bson.D{{Key: "$max", Value: bson.D{{Key: "count", Value: count}}}}
-	_, err := s.onlineHour.UpdateOne(ctx, hourFilter, hourUpdate, options.UpdateOne().SetUpsert(true))
+	buckets := []struct {
+		coll   *mongo.Collection
+		bucket int64
+	}{
+		{s.onlineUserMinute, minute},
+		{s.onlineUserHour, hour},
+	}
 
-	return err
+	for _, b := range buckets {
+		models := make([]mongo.WriteModel, 0, len(smp.Online))
+
+		for _, u := range smp.Online {
+			filter := bson.D{
+				{Key: "bucket", Value: b.bucket}, {Key: "node_key", Value: smp.NodeKey}, {Key: "email", Value: u.Email},
+			}
+			// Presence is the row's whole content, so an existing row needs no update.
+			update := bson.D{{Key: "$setOnInsert", Value: filter}}
+			models = append(models, mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(update).SetUpsert(true))
+		}
+
+		if _, err := b.coll.BulkWrite(ctx, models); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // writeOnlineUsers inserts the current snapshot's presence rows. Every

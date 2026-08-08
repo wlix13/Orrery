@@ -21,6 +21,7 @@ type (
 
 const (
 	AggEntity = store.AggEntity
+	AggNode   = store.AggNode
 	AggTotal  = store.AggTotal
 )
 
@@ -39,6 +40,7 @@ func Run(t *testing.T, open Factory) {
 		{"SeriesHourTable", testSeriesHourTable},
 		{"SeriesRejectsBadParams", testSeriesRejectsBadParams},
 		{"OnlineLifecycle", testOnlineLifecycle},
+		{"OnlineDedupesAcrossHubs", testOnlineDedupesAcrossHubs},
 		{"UsersHubOnly", testUsersHubOnly},
 		{"RegisterNodesPrunes", testRegisterNodesPrunes},
 		{"Retention", testRetention},
@@ -205,7 +207,7 @@ func testOnlineLifecycle(t *testing.T, s store.Store) {
 		t.Fatalf("online rows = %+v, want none", rows)
 	}
 
-	// But the online gauge kept the minute-1 count.
+	// But the minute-1 presence row survives their going offline.
 	series, err := s.Series(ctx, SeriesParams{
 		From: now.Unix(), To: now.Add(2 * time.Minute).Unix(), Step: 60, Kind: "online", Agg: AggTotal, Scope: store.AllFleets(),
 	})
@@ -215,6 +217,79 @@ func testOnlineLifecycle(t *testing.T, s store.Store) {
 
 	if len(series) != 1 || series[0].Points[0] != 1 || series[0].Points[1] != 0 {
 		t.Fatalf("online series = %+v, want [1 0]", series)
+	}
+}
+
+// Presence is per identity, not per connection: a user on several hubs at once
+// is one online user everywhere - the Overview count and the collapsed series.
+func testOnlineDedupesAcrossHubs(t *testing.T, s store.Store) {
+	ctx := context.Background()
+
+	hubs := []Node{
+		{Key: "main/hubA", Fleet: "main", ID: "hubA", Region: "eu", Type: "hub", Collect: "full"},
+		{Key: "main/hubB", Fleet: "main", ID: "hubB", Region: "us", Type: "hub", Collect: "full"},
+	}
+	if err := s.RegisterNodes(ctx, hubs); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, h := range hubs {
+		if err := s.WriteSample(ctx, Sample{
+			NodeKey: h.Key, TS: now,
+			Online: []xray.OnlineUser{
+				{Email: "roamer@ns", IPs: []xray.OnlineIP{{IP: "192.0.2.9", LastSeen: now.Unix()}}},
+				{Email: h.ID + "-only@ns"},
+			},
+			OnlineCollected: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ov, err := s.OverviewTraffic(ctx, now.Unix(), now.Add(time.Hour).Unix(), store.AllFleets())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ov.OnlineUsers != 3 {
+		t.Errorf("OnlineUsers = %d, want 3 (roamer is one user, not one per hub)", ov.OnlineUsers)
+	}
+
+	// Both bucket resolutions must agree with the live count.
+	for _, tc := range []struct {
+		name string
+		step int64
+	}{{"minute", 60}, {"hour", 3600}} {
+		total, err := s.Series(ctx, SeriesParams{
+			From: now.Unix(), To: now.Add(time.Duration(tc.step) * time.Second).Unix(), Step: tc.step,
+			Kind: "online", Agg: AggTotal, Scope: store.AllFleets(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(total) != 1 || total[0].Points[0] != 3 {
+			t.Errorf("%s total series = %+v, want one series [3]", tc.name, total)
+		}
+	}
+
+	perNode, err := s.Series(ctx, SeriesParams{
+		From: now.Unix(), To: now.Add(time.Minute).Unix(), Step: 60,
+		Kind: "online", Agg: AggNode, Scope: store.AllFleets(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Collapsing is what dedupes; each hub still reports both of its own users.
+	if len(perNode) != 2 {
+		t.Fatalf("per-node series = %+v, want one per hub", perNode)
+	}
+
+	for _, sr := range perNode {
+		if sr.Points[0] != 2 {
+			t.Errorf("%s = %v, want [2]", sr.Node, sr.Points)
+		}
 	}
 }
 

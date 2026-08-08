@@ -410,31 +410,33 @@ func (s *Store) onlineSeries(ctx context.Context, p store.SeriesParams, slots in
 		return nil, nil
 	}
 
-	coll := s.onlineMinute
+	coll := s.onlineUserMinute
 	if p.Step >= 3600 {
-		coll = s.onlineHour
+		coll = s.onlineUserHour
 	}
 
 	match := bson.D{
 		{Key: "node_key", Value: bson.D{{Key: "$in", Value: allowed}}},
 		{Key: "bucket", Value: bson.D{{Key: "$gte", Value: p.From}, {Key: "$lt", Value: p.To}}},
 	}
-	// Per-slot: MAX per node (it's a gauge), then SUM across nodes when the
-	// caller wants nodes collapsed.
-	perNodeGroup := bson.D{
-		{Key: "_id", Value: bson.D{{Key: "slot", Value: slotExpr(p.From, p.Step)}, {Key: "node", Value: "$node_key"}}},
-		{Key: "count", Value: bson.D{{Key: "$max", Value: "$count"}}},
-	}
-
-	pipeline := mongo.Pipeline{{{Key: "$match", Value: match}}, {{Key: "$group", Value: perNodeGroup}}}
+	// Dedupe to one row per distinct email in the slot, then count the rows, so
+	// a user online on several hubs counts once when nodes are collapsed.
+	distinctID := bson.D{{Key: "slot", Value: slotExpr(p.From, p.Step)}, {Key: "email", Value: "$email"}}
+	countID := bson.D{{Key: "slot", Value: "$_id.slot"}}
 
 	perNode := p.Agg == store.AggNone || p.Agg == store.AggNode || p.Agg == ""
-	if !perNode {
-		collapse := bson.D{
-			{Key: "_id", Value: bson.D{{Key: "slot", Value: "$_id.slot"}}},
-			{Key: "count", Value: bson.D{{Key: "$sum", Value: "$count"}}},
-		}
-		pipeline = append(pipeline, bson.D{{Key: "$group", Value: collapse}})
+	if perNode {
+		distinctID = append(distinctID, bson.E{Key: "node", Value: "$node_key"})
+		countID = append(countID, bson.E{Key: "node", Value: "$_id.node"})
+	}
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: match}},
+		{{Key: "$group", Value: bson.D{{Key: "_id", Value: distinctID}}}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: countID},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
 	}
 
 	cur, err := coll.Aggregate(ctx, pipeline)

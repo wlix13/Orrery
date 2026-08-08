@@ -29,13 +29,13 @@ type Store struct {
 	client *mongo.Client
 	db     *mongo.Database
 
-	nodes         *mongo.Collection
-	countersLast  *mongo.Collection
-	trafficMinute *mongo.Collection
-	trafficHour   *mongo.Collection
-	onlineMinute  *mongo.Collection
-	onlineHour    *mongo.Collection
-	onlineCurrent *mongo.Collection
+	nodes            *mongo.Collection
+	countersLast     *mongo.Collection
+	trafficMinute    *mongo.Collection
+	trafficHour      *mongo.Collection
+	onlineUserMinute *mongo.Collection
+	onlineUserHour   *mongo.Collection
+	onlineCurrent    *mongo.Collection
 }
 
 var _ store.Store = (*Store)(nil)
@@ -61,15 +61,15 @@ func Open(ctx context.Context, uri string) (*Store, error) {
 	db := client.Database(dbNameFromURI(uri))
 
 	s := &Store{
-		client:        client,
-		db:            db,
-		nodes:         db.Collection("nodes"),
-		countersLast:  db.Collection("counters_last"),
-		trafficMinute: db.Collection("traffic_minute"),
-		trafficHour:   db.Collection("traffic_hour"),
-		onlineMinute:  db.Collection("online_minute"),
-		onlineHour:    db.Collection("online_hour"),
-		onlineCurrent: db.Collection("online_current"),
+		client:           client,
+		db:               db,
+		nodes:            db.Collection("nodes"),
+		countersLast:     db.Collection("counters_last"),
+		trafficMinute:    db.Collection("traffic_minute"),
+		trafficHour:      db.Collection("traffic_hour"),
+		onlineUserMinute: db.Collection("online_user_minute"),
+		onlineUserHour:   db.Collection("online_user_hour"),
+		onlineCurrent:    db.Collection("online_current"),
 	}
 
 	if err := s.ensureIndexes(ctx); err != nil {
@@ -121,12 +121,8 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 		}},
 		{s.trafficMinute, trafficIndexes()},
 		{s.trafficHour, trafficIndexes()},
-		{s.onlineMinute, []mongo.IndexModel{
-			{Keys: bson.D{{Key: "bucket", Value: 1}, {Key: "node_key", Value: 1}}, Options: unique},
-		}},
-		{s.onlineHour, []mongo.IndexModel{
-			{Keys: bson.D{{Key: "bucket", Value: 1}, {Key: "node_key", Value: 1}}, Options: unique},
-		}},
+		{s.onlineUserMinute, onlinePresenceIndexes()},
+		{s.onlineUserHour, onlinePresenceIndexes()},
 		{s.onlineCurrent, []mongo.IndexModel{
 			{
 				Keys:    bson.D{{Key: "node_key", Value: 1}, {Key: "email", Value: 1}, {Key: "ip", Value: 1}},
@@ -154,6 +150,17 @@ func trafficIndexes() []mongo.IndexModel {
 			Options: options.Index().SetUnique(true),
 		},
 		{Keys: bson.D{{Key: "kind", Value: 1}, {Key: "entity", Value: 1}, {Key: "bucket", Value: 1}}},
+	}
+}
+
+func onlinePresenceIndexes() []mongo.IndexModel {
+	return []mongo.IndexModel{
+		{
+			Keys: bson.D{
+				{Key: "bucket", Value: 1}, {Key: "node_key", Value: 1}, {Key: "email", Value: 1},
+			},
+			Options: options.Index().SetUnique(true),
+		},
 	}
 }
 
@@ -295,9 +302,9 @@ func (s *Store) Retention(ctx context.Context, minute, hour time.Duration) error
 		cutoff int64
 	}{
 		{s.trafficMinute, now - int64(minute.Seconds())},
-		{s.onlineMinute, now - int64(minute.Seconds())},
+		{s.onlineUserMinute, now - int64(minute.Seconds())},
 		{s.trafficHour, now - int64(hour.Seconds())},
-		{s.onlineHour, now - int64(hour.Seconds())},
+		{s.onlineUserHour, now - int64(hour.Seconds())},
 	}
 
 	for _, w := range windows {

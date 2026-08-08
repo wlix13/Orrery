@@ -96,8 +96,9 @@ nodes           node_key PK (fleet/id), fleet, id, region, type, hostname,
 counters_last   node_key, name → value, ts        (delta base)
 traffic_minute  bucket_ts, node_key, kind, entity, dir → bytes
 traffic_hour    bucket_ts, node_key, kind, entity, dir → bytes
-online_minute   bucket_ts, node_key → count        (gauge, last-write-wins)
-online_current  node_key, email, ip, last_seen     (snapshot per poll)
+online_user_minute  bucket_ts, node_key, email     (presence, one row per identity)
+online_user_hour    bucket_ts, node_key, email     (presence, one row per identity)
+online_current      node_key, email, ip, last_seen (snapshot per poll)
 ```
 
 Node status is derived at request time rather than stored: `up` if the last successful poll is under 2× the poll interval old, `stale` under 5×, else `down`.
