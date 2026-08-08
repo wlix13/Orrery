@@ -92,17 +92,17 @@ CREATE TABLE IF NOT EXISTS traffic_hour (
   PRIMARY KEY (bucket, node_key, kind, entity, dir)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_th_kind_entity ON traffic_hour (kind, entity, bucket);
-CREATE TABLE IF NOT EXISTS online_minute (
+CREATE TABLE IF NOT EXISTS online_user_minute (
   bucket   INTEGER NOT NULL,
   node_key TEXT NOT NULL,
-  count    INTEGER NOT NULL,
-  PRIMARY KEY (bucket, node_key)
+  email    TEXT NOT NULL,
+  PRIMARY KEY (bucket, node_key, email)
 ) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS online_hour (
+CREATE TABLE IF NOT EXISTS online_user_hour (
   bucket   INTEGER NOT NULL,
   node_key TEXT NOT NULL,
-  count    INTEGER NOT NULL,
-  PRIMARY KEY (bucket, node_key)
+  email    TEXT NOT NULL,
+  PRIMARY KEY (bucket, node_key, email)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS online_current (
   node_key  TEXT NOT NULL,
@@ -286,20 +286,31 @@ func writeOnline(ctx context.Context, tx *sql.Tx, smp Sample, ts, minute, hour i
 		}
 	}
 
-	count := len(smp.Online)
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO online_minute (bucket, node_key, count) VALUES (?, ?, ?)
-		ON CONFLICT(bucket, node_key) DO UPDATE SET count=excluded.count`,
-		minute, smp.NodeKey, count); err != nil {
-		return err
+	return writeOnlinePresence(ctx, tx, smp, minute, hour)
+}
+
+// writeOnlinePresence records one row per (bucket, node, email) so queries can
+// count distinct users across nodes instead of summing per-node gauges.
+func writeOnlinePresence(ctx context.Context, tx *sql.Tx, smp Sample, minute, hour int64) error {
+	for table, bucket := range map[string]int64{"online_user_minute": minute, "online_user_hour": hour} {
+		stmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO `+table+` (bucket, node_key, email) VALUES (?, ?, ?)
+			ON CONFLICT DO NOTHING`)
+		if err != nil {
+			return err
+		}
+
+		for _, u := range smp.Online {
+			if _, err := stmt.ExecContext(ctx, bucket, smp.NodeKey, u.Email); err != nil {
+				stmt.Close()
+				return err
+			}
+		}
+
+		stmt.Close()
 	}
 
-	_, err := tx.ExecContext(ctx, `
-		INSERT INTO online_hour (bucket, node_key, count) VALUES (?, ?, ?)
-		ON CONFLICT(bucket, node_key) DO UPDATE SET count=MAX(count, excluded.count)`,
-		hour, smp.NodeKey, count)
-
-	return err
+	return nil
 }
 
 func writeOnlineUser(ctx context.Context, tx *sql.Tx, nodeKey string, u xray.OnlineUser, ts int64) error {
@@ -340,10 +351,10 @@ func (s *Store) MarkNodeError(ctx context.Context, nodeKey, msg string, ts time.
 func (s *Store) Retention(ctx context.Context, minute, hour time.Duration) error {
 	now := time.Now().Unix()
 	for table, cutoff := range map[string]int64{
-		"traffic_minute": now - int64(minute.Seconds()),
-		"online_minute":  now - int64(minute.Seconds()),
-		"traffic_hour":   now - int64(hour.Seconds()),
-		"online_hour":    now - int64(hour.Seconds()),
+		"traffic_minute":     now - int64(minute.Seconds()),
+		"online_user_minute": now - int64(minute.Seconds()),
+		"traffic_hour":       now - int64(hour.Seconds()),
+		"online_user_hour":   now - int64(hour.Seconds()),
 	} {
 		if _, err := s.db.ExecContext(ctx, "DELETE FROM "+table+" WHERE bucket < ?", cutoff); err != nil {
 			return fmt.Errorf("retention %s: %w", table, err)
