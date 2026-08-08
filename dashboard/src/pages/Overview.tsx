@@ -81,7 +81,7 @@ export default function Overview() {
 
   const online = useApiData(async () => {
     const { from, to, step } = windowForRange(range);
-    const res = await client.getSeries({ from, to, step, kind: "online" });
+    const res = await client.getSeries({ from, to, step, kind: "online", type: "hub", agg: "total" });
     const timestamps = Array.from({ length: Math.round((to - from) / step) }, (_, i) => from + i * step);
     const points = res.series[0]?.points ?? [];
     // Built here, not inline in JSX, to keep the array identity stable.

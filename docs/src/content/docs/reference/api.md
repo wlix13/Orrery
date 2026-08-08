@@ -161,7 +161,10 @@ Omitting `step` picks the smallest of 60, 300, 900, 3600, 21600 or 86400 seconds
 Minute buckets are read below a 3600-second step, hour buckets at or above it.
 More than 2000 points is rejected with `bad_query`.
 
-`kind=online` returns gauge counts of online users rather than byte totals; only the `node` and `fleet` filters apply to it.
+`kind=online` counts online users rather than byte totals, so the `entity` and `dir` filters do not apply to it.
+Presence is stored per identity, so counting is by distinct user: `agg=entity` or `agg=total` collapses nodes and counts a user connected to several hubs once, while `agg=none` and `agg=node` keep one series per node.
+A point covers the whole bucket, so at an hour step it is the users seen during that hour rather than a concurrent peak.
+Pair it with `type=hub` to match the `online_users` count in `/api/overview`.
 
 ### `GET /api/users`
 

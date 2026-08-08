@@ -171,9 +171,9 @@ func (s *Store) Series(ctx context.Context, p SeriesParams) ([]Series, error) {
 }
 
 func (s *Store) onlineSeries(ctx context.Context, p SeriesParams, slots int64) ([]Series, error) {
-	table := "online_minute"
+	table := "online_user_minute"
 	if p.Step >= 3600 {
-		table = "online_hour"
+		table = "online_user_hour"
 	}
 
 	perNode := p.Agg == AggNone || p.Agg == AggNode || p.Agg == ""
@@ -199,15 +199,15 @@ func (s *Store) onlineSeries(ctx context.Context, p SeriesParams, slots int64) (
 		conds = append(conds, scoped)
 		args = append(args, scopeArgs...)
 	}
-	// Per-slot: MAX per node (gauge), then SUM across nodes when aggregating.
-	inner := "SELECT ((o.bucket - ?) / ?) AS slot, o.node_key AS nk, MAX(o.count) AS c" +
-		" FROM " + table + " o JOIN nodes n ON n.node_key = o.node_key" +
-		" WHERE " + strings.Join(conds, " AND ") + " GROUP BY slot, nk"
-	q := inner
-
+	// Distinct emails per slot, so a user online on several hubs counts once.
+	sel, group := "SELECT ((o.bucket - ?) / ?) AS slot, o.node_key AS nk", "slot, nk"
 	if !perNode {
-		q = "SELECT slot, SUM(c) FROM (" + inner + ") GROUP BY slot"
+		sel, group = "SELECT ((o.bucket - ?) / ?) AS slot", "slot"
 	}
+
+	q := sel + ", COUNT(DISTINCT o.email)" +
+		" FROM " + table + " o JOIN nodes n ON n.node_key = o.node_key" +
+		" WHERE " + strings.Join(conds, " AND ") + " GROUP BY " + group
 
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
