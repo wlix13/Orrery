@@ -3,7 +3,6 @@ title: Deployment and operations
 description: Building, deploying and running the Orrery collector, and the day-2 questions that follow.
 ---
 
-
 Practical questions, deployment-first.
 [Getting started](/Orrery/guides/getting-started/) is the shorter path for a first collector; this page is the production shape and the day-2 questions.
 
@@ -54,6 +53,7 @@ Type=simple
 User=orrery
 Group=orrery
 ExecStart=/usr/local/bin/orrery -config /etc/orrery/orrery.yaml serve
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5s
 EnvironmentFile=-/etc/orrery/env
@@ -142,8 +142,9 @@ The dashboard needs no configuration for this: a single-fleet token simply gets 
 
 ### How do I add or remove a node?
 
-Edit the fleet's topology file, deploy the node as usual, then restart the collector.
-Nodes are re-registered at startup; removed nodes disappear from the API, and their history rows stay in the database but are no longer reachable.
+Edit the fleet's topology file and deploy the node as usual.
+The collector picks the change up on its own within seconds (see [Reloading](/Orrery/reference/configuration/#reloading)), or right away on `systemctl reload orrery`.
+A removed node stays in the API and dashboard as `retired` with its history intact; listing it again resumes polling.
 Nodes outside the topology go under `fleets[].nodes` with an `address` and `type`.
 
 ### What happens when things restart?

@@ -8,6 +8,17 @@ A complete annotated example lives at [`orrery.example.yaml`](https://github.com
 
 Values are env-expanded, so `${ORRERY_TOKEN}` picks the token up from the environment rather than baking a secret into the file.
 
+## Reloading
+
+A running collector re-reads its config on `SIGHUP`, and on its own within ten seconds of the config file or any `fleets[].topology` file changing on disk.
+A reload that fails to parse or validate is logged and the running config stays.
+
+On reload, `fleets`, `auth`, `poll`, `retention`, `host_key_verify` and `sshfp_require_dnssec` take effect.
+Only pollers whose node changed restart; the rest keep their connection.
+A node that disappears from the config is kept as `retired` rather than deleted.
+
+`listen`, `db`, `metrics` and `dashboard` are wired once at startup; changing them logs a warning and needs a restart.
+
 ## Server
 
 | Setting | Default | Meaning |
