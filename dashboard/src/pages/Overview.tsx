@@ -24,11 +24,12 @@ interface TrafficChart {
 }
 
 /** "3 stale · 1 down", dropping the zeroes. */
-function nodesBreakdown(n: { stale: number; down: number; off: number }): string {
+function nodesBreakdown(n: { stale: number; down: number; off: number; retired: number }): string {
   const parts: string[] = [];
   if (n.stale > 0) parts.push(`${n.stale} stale`);
   if (n.down > 0) parts.push(`${n.down} down`);
   if (n.off > 0) parts.push(`${n.off} off`);
+  if (n.retired > 0) parts.push(`${n.retired} retired`);
   return parts.length > 0 ? parts.join(" · ") : "all reporting";
 }
 

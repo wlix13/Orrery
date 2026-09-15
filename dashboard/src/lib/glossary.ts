@@ -6,6 +6,7 @@ export const STATUS_LABEL: Record<NodeStatus, string> = {
   stale: "Stale",
   down: "Down",
   off: "Off",
+  retired: "Retired",
 };
 
 /** One-line ops glossary for status dots / tooltips. */
@@ -14,6 +15,7 @@ export const STATUS_HELP: Record<NodeStatus, string> = {
   stale: "Missed recent poll(s) - node may be slow or intermittently unreachable.",
   down: "Unreachable or consecutive poll failures.",
   off: "Collection disabled (collect: off) - calm state, not an outage.",
+  retired: "Removed from the config - kept for its history, never polled again.",
 };
 
 export const COLLECT_LABEL: Record<CollectLevel, string> = {

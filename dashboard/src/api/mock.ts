@@ -72,6 +72,7 @@ const ALL_NODES: MockNode[] = [
   { id: "hub02", fleet: "secondary", type: "hub", region: "us-west", status: "up", collect: "full", inbounds: ["vless-in", "vmess-in", "trojan-in"], outbounds: ["direct-out", "block-out"] },
   { id: "exit01", fleet: "secondary", type: "exit", region: "ap-south", status: "down", collect: "traffic", inbounds: ["relay-in"], outbounds: ["direct-out", "block-out"] },
   { id: "exit02", fleet: "secondary", type: "exit", region: "ap-east", status: "off", collect: "off", inbounds: [], outbounds: [] },
+  { id: "exit03", fleet: "secondary", type: "exit", region: "ap-east", status: "retired", collect: "traffic", inbounds: ["relay-in"], outbounds: ["direct-out"] },
 ];
 // VITE_MOCK_SINGLE_FLEET=1 keeps only "main", to exercise the single-fleet UI.
 const NODES: MockNode[] =
@@ -215,7 +216,7 @@ function sysStats(n: MockNode, nowSeconds: number) {
   const seed = hashStr(nodeKey(n));
   const uptimeBase = 3 * 86400 + (seed % (14 * 86400));
   return {
-    uptime_s: n.status === "down" || n.status === "off" ? 0 : uptimeBase,
+    uptime_s: n.status === "down" || n.status === "off" || n.status === "retired" ? 0 : uptimeBase,
     num_goroutine: 40 + (seed % 60),
     alloc_bytes: (30 + (seed % 90)) * 1024 * 1024,
     sys_bytes: (80 + (seed % 150)) * 1024 * 1024,
@@ -230,6 +231,9 @@ function lastOkErr(n: MockNode, nowSeconds: number): { last_ok: number | null; l
   }
   if (n.status === "stale") {
     return { last_ok: nowSeconds - (150 + (seed % 130)), last_err: null };
+  }
+  if (n.status === "retired") {
+    return { last_ok: nowSeconds - 3 * 86400, last_err: null };
   }
   if (n.status === "off") {
     // Intentionally disabled - never polled, so no error and no last_ok.
@@ -301,7 +305,8 @@ export const mockClient: OrreryClient = {
     const { from, to, step } = windowForRange(range);
     const nowS = now();
 
-    const total = NODES.length;
+    const retired = NODES.filter((n) => n.status === "retired").length;
+    const total = NODES.length - retired;
     const up = NODES.filter((n) => n.status === "up").length;
     const stale = NODES.filter((n) => n.status === "stale").length;
     const down = NODES.filter((n) => n.status === "down").length;
@@ -309,7 +314,7 @@ export const mockClient: OrreryClient = {
 
     const fleetNames = [...new Set(NODES.map((n) => n.fleet))];
     const fleets = fleetNames.map((fleet) => {
-      const fleetNodes = NODES.filter((n) => n.fleet === fleet);
+      const fleetNodes = NODES.filter((n) => n.fleet === fleet && n.status !== "retired");
       const hubNodes = fleetNodes.filter((n) => n.type === "hub");
       let upBytes = 0;
       let downBytes = 0;
@@ -358,7 +363,7 @@ export const mockClient: OrreryClient = {
 
     return {
       generated_at: nowS,
-      nodes: { total, up, stale, down, off },
+      nodes: { total, up, stale, down, off, retired },
       online_users: onlineUsers,
       totals,
       fleets,
