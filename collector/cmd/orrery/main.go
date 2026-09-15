@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -82,30 +83,16 @@ func run(log *slog.Logger) error {
 		return nil
 	}
 
-	cfg, err := config.Load(*cfgPath)
+	cfg, nodes, err := load(*cfgPath)
 	if err != nil {
 		return err
 	}
 
-	if cfg.HostKeyVerify == config.VerifyInsecure {
-		log.Warn("SSH host key verification is DISABLED (host_key_verify: insecure) - do not use in production")
-	}
-
-	if cfg.Auth.AllowAnonymous {
-		log.Warn("API and /metrics are UNAUTHENTICATED (auth.allow_anonymous)",
-			"listen", cfg.Listen, "loopback", cfg.ListenIsLoopback())
-	} else {
-		log.Info("auth configured", "tokens", len(cfg.Auth.Tokens))
-	}
-
-	nodes, err := resolveAll(cfg)
-	if err != nil {
-		return err
-	}
+	warnConfig(cfg, log)
 
 	switch cmd {
 	case "serve":
-		return serve(cfg, nodes, log)
+		return serve(cfg, nodes, *cfgPath, log)
 	case "probe":
 		if len(rest) != 1 {
 			return errors.New("usage: orrery probe <fleet/id>")
@@ -115,6 +102,35 @@ func run(log *slog.Logger) error {
 	default:
 		fs.Usage()
 		return fmt.Errorf("unknown command %q", cmd)
+	}
+}
+
+// load reads config and resolves every fleet's nodes.
+func load(path string) (*config.Config, []config.ResolvedNode, error) {
+	cfg, err := config.Load(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodes, err := resolveAll(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cfg, nodes, nil
+}
+
+// warnConfig flags settings that must not reach production by accident.
+func warnConfig(cfg *config.Config, log *slog.Logger) {
+	if cfg.HostKeyVerify == config.VerifyInsecure {
+		log.Warn("SSH host key verification is DISABLED (host_key_verify: insecure) - do not use in production")
+	}
+
+	if cfg.Auth.AllowAnonymous {
+		log.Warn("API and /metrics are UNAUTHENTICATED (auth.allow_anonymous)",
+			"listen", cfg.Listen, "loopback", cfg.ListenIsLoopback())
+	} else {
+		log.Info("auth configured", "tokens", len(cfg.Auth.Tokens))
 	}
 }
 
@@ -146,16 +162,17 @@ func resolveAll(cfg *config.Config) ([]config.ResolvedNode, error) {
 	return all, nil
 }
 
-// buildTarget wires a node's dialer. The returned closer releases the SSH
-// connection (nil for direct dial).
-func buildTarget(n config.ResolvedNode, verify string, requireDNSSEC bool) (poller.Target, func(), error) {
-	target := poller.Target{
-		Node: store.Node{
-			Key: n.Key(), Fleet: n.Fleet, ID: n.ID, Region: n.Region,
-			Type: n.Type, Hostname: n.Hostname, Collect: n.Collect,
-		},
-		Collect: n.Collect,
+func storeNode(n config.ResolvedNode) store.Node {
+	return store.Node{
+		Key: n.Key(), Fleet: n.Fleet, ID: n.ID, Region: n.Region,
+		Type: n.Type, Hostname: n.Hostname, Collect: n.Collect,
 	}
+}
+
+// buildTarget wires a node's dialer. The returned closer releases the SSH
+// connection (no-op for direct dial).
+func buildTarget(n config.ResolvedNode, verify string, requireDNSSEC bool) (poller.Target, func(), error) {
+	target := poller.Target{Node: storeNode(n), Collect: n.Collect}
 
 	switch n.Dial {
 	case config.DialDirect:
@@ -180,7 +197,12 @@ func buildTarget(n config.ResolvedNode, verify string, requireDNSSEC bool) (poll
 	}
 }
 
-func serve(cfg *config.Config, nodes []config.ResolvedNode, log *slog.Logger) error {
+func serve(cfg *config.Config, nodes []config.ResolvedNode, cfgPath string, log *slog.Logger) error {
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+
+	defer signal.Stop(hup)
+
 	st, err := openStore(cfg.DB)
 	if err != nil {
 		return err
@@ -190,44 +212,18 @@ func serve(cfg *config.Config, nodes []config.ResolvedNode, log *slog.Logger) er
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	storeNodes := make([]store.Node, 0, len(nodes))
+	// Live config: apply stores it, API and retention sweep read it.
+	var current atomic.Pointer[config.Config]
 
-	var targets []poller.Target
+	ps := &pollerSet{st: st, log: log, cfg: &current, running: map[string]*runningPoller{}}
 
-	var closers []func()
-
-	for _, n := range nodes {
-		t, closer, err := buildTarget(n, cfg.HostKeyVerify, cfg.RequireDNSSEC())
-		if err != nil {
-			return err
-		}
-
-		storeNodes = append(storeNodes, t.Node)
-
-		if n.Collect != config.CollectOff {
-			targets = append(targets, t)
-			closers = append(closers, closer)
-		} else {
-			closer()
-		}
-	}
-
-	defer func() {
-		for _, c := range closers {
-			c()
-		}
-	}()
-
-	if err := st.RegisterNodes(ctx, storeNodes); err != nil {
+	if err := ps.apply(ctx, cfg, nodes); err != nil {
 		return err
 	}
 
 	var wg sync.WaitGroup
-	for _, t := range targets {
-		wg.Go(func() {
-			poller.New(t, st, cfg.Poll, log).Run(ctx)
-		})
-	}
+
+	wg.Go(func() { ps.watch(ctx, cfgPath, hup) })
 
 	// Retention sweep hourly.
 	wg.Go(func() {
@@ -235,7 +231,8 @@ func serve(cfg *config.Config, nodes []config.ResolvedNode, log *slog.Logger) er
 		defer ticker.Stop()
 
 		for {
-			if err := st.Retention(ctx, cfg.Retention.Minute.D(), cfg.Retention.Hour.D()); err != nil {
+			r := current.Load().Retention
+			if err := st.Retention(ctx, r.Minute.D(), r.Hour.D()); err != nil {
 				log.Error("retention", "err", err)
 			}
 
@@ -249,7 +246,7 @@ func serve(cfg *config.Config, nodes []config.ResolvedNode, log *slog.Logger) er
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           api.New(st, cfg, version, log).Handler(),
+		Handler:           api.New(st, &current, version, log).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -262,13 +259,19 @@ func serve(cfg *config.Config, nodes []config.ResolvedNode, log *slog.Logger) er
 		_ = srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Info("orrery serving", "listen", cfg.Listen, "nodes", len(storeNodes), "polling", len(targets), "version", version)
+	log.Info("orrery serving", "listen", cfg.Listen, "version", version)
 
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+	err = srv.ListenAndServe()
+
+	// Reload loop must be idle before pollers are torn down.
+	stop()
+	wg.Wait()
+	ps.stopAll()
+
+	if !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 
-	wg.Wait()
 	log.Info("shut down cleanly")
 
 	return nil

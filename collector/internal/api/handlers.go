@@ -68,7 +68,7 @@ func (s *Server) nodeStatus(n store.NodeStatus) string {
 	}
 
 	age := time.Since(time.Unix(n.LastOK, 0))
-	interval := s.cfg.Poll.Interval.D()
+	interval := s.cfg.Load().Poll.Interval.D()
 
 	switch {
 	case age < 2*interval:
