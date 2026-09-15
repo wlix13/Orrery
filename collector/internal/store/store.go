@@ -59,8 +59,8 @@ func (s Scope) Permits(fleet string) bool {
 // and lifecycle (main).
 type Store interface {
 	// RegisterNodes reconciles the node registry with the configured set.
-	// Rows for removed nodes are deleted; their traffic history becomes
-	// invisible (every query is scoped to registered nodes).
+	// Listed nodes upsert, unlisted rows stay but flip to retired, history kept readable.
+	// Online snapshots survive only on nodes polled at collect: full.
 	RegisterNodes(ctx context.Context, nodes []Node) error
 	// LastCounters loads the delta base for a node (once per poller start).
 	LastCounters(ctx context.Context, nodeKey string) (map[string]int64, error)
@@ -123,6 +123,7 @@ type NodeStatus struct {
 	AllocBytes   int64
 	SysBytes     int64
 	NumGC        int64
+	Retired      bool // dropped from config, history kept
 }
 
 // Delta is one parsed counter increment.
