@@ -42,7 +42,7 @@ func Run(t *testing.T, open Factory) {
 		{"OnlineLifecycle", testOnlineLifecycle},
 		{"OnlineDedupesAcrossHubs", testOnlineDedupesAcrossHubs},
 		{"UsersHubOnly", testUsersHubOnly},
-		{"RegisterNodesPrunes", testRegisterNodesPrunes},
+		{"RegisterNodesRetires", testRegisterNodesRetires},
 		{"Retention", testRetention},
 		{"ScopeIsolatesLists", testScopeIsolatesLists},
 		{"ScopeIsolatesAggregates", testScopeIsolatesAggregates},
@@ -316,12 +316,21 @@ func testUsersHubOnly(t *testing.T, s store.Store) {
 	}
 }
 
-func testRegisterNodesPrunes(t *testing.T, s store.Store) {
+func testRegisterNodesRetires(t *testing.T, s store.Store) {
 	seed(t, s)
 
 	ctx := context.Background()
 
-	if err := s.RegisterNodes(ctx, testNodes[:1]); err != nil { // drop the exit
+	// Put hub online, then drop it from configured set.
+	if err := s.WriteSample(ctx, Sample{
+		NodeKey: "main/mskA00", TS: now.Add(2 * time.Minute),
+		Counters: map[string]int64{"c1": 200},
+		Online:   []xray.OnlineUser{{Email: "alice@ns"}}, OnlineCollected: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.RegisterNodes(ctx, testNodes[1:]); err != nil {
 		t.Fatal(err)
 	}
 
@@ -330,17 +339,50 @@ func testRegisterNodesPrunes(t *testing.T, s store.Store) {
 		t.Fatal(err)
 	}
 
-	if len(statuses) != 1 || statuses[0].Key != "main/mskA00" {
-		t.Fatalf("statuses = %+v, want only main/mskA00", statuses)
+	if len(statuses) != 2 || !statuses[0].Retired || statuses[1].Retired {
+		t.Fatalf("statuses = %+v, want mskA00 retired and nlA00 kept", statuses)
 	}
 
-	last, err := s.LastCounters(ctx, "main/nlA00")
+	last, err := s.LastCounters(ctx, "main/mskA00")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(last) != 0 {
-		t.Errorf("pruned node still has counters: %v", last)
+	if last["c1"] != 200 {
+		t.Errorf("retired node lost its delta base: %v", last)
+	}
+
+	online, err := s.OnlineNow(ctx, store.AllFleets())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(online) != 0 {
+		t.Errorf("retired node still online: %+v", online)
+	}
+
+	counters, err := s.Counters(ctx, store.AllFleets())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range counters {
+		if c.NodeKey == "main/mskA00" {
+			t.Errorf("retired node still exported: %+v", c)
+		}
+	}
+
+	// Listing it again un-retires it.
+	if err := s.RegisterNodes(ctx, testNodes); err != nil {
+		t.Fatal(err)
+	}
+
+	if statuses, err = s.NodeStatuses(ctx, store.AllFleets()); err != nil {
+		t.Fatal(err)
+	}
+
+	if statuses[0].Retired {
+		t.Errorf("re-registered node still retired: %+v", statuses[0])
 	}
 }
 
