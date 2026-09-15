@@ -89,6 +89,7 @@ Buckets are written at ingest into **both** minute and hour resolution (upsert `
 
 MongoDB caveat: standalone servers have no multi-document transactions, so `WriteSample` is ordered best-effort - the counter delta-base is persisted *first*, so a crash mid-write can under-count one poll interval but never double-count.
 SQLite writes stay fully transactional.
+The SQLite schema is versioned through `PRAGMA user_version`: opening a file applies the migrations it lacks.
 
 ```text
 nodes           node_key PK (fleet/id), fleet, id, region, type, hostname,

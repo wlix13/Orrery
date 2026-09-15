@@ -39,12 +39,54 @@ func Open(path string) (*Store, error) {
 
 	db.SetMaxOpenConns(8)
 
-	if _, err := db.Exec(schema); err != nil {
+	if err := migrate(db); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("apply schema: %w", err)
+		return nil, err
 	}
 
 	return &Store{db: db, writeGate: make(chan struct{}, 1)}, nil
+}
+
+// migrations is schema history, one step per version, applied by Open past user_version. Append only, never edit shipped steps.
+var migrations = []string{schema}
+
+func migrate(db *sql.DB) error {
+	var version int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		return fmt.Errorf("read schema version: %w", err)
+	}
+
+	if version < 0 || version > len(migrations) {
+		return fmt.Errorf("unsupported schema version %d (this build knows up to %d)", version, len(migrations))
+	}
+
+	for i, step := range migrations[version:] {
+		next := version + i + 1
+		if err := applyMigration(db, step, next); err != nil {
+			return fmt.Errorf("apply schema migration %d: %w", next, err)
+		}
+	}
+
+	return nil
+}
+
+// applyMigration runs one step and stamps its version in one transaction.
+func applyMigration(db *sql.DB, step string, version int) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(step); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", version)); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (s *Store) Close() error { return s.db.Close() }
