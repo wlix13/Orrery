@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/wlix13/orrery/collector/internal/store"
 	"github.com/wlix13/orrery/collector/internal/xray"
@@ -30,6 +31,9 @@ func Handler(st store.Store, log *slog.Logger, status func(store.NodeStatus) str
 			fail(w, err)
 			return
 		}
+
+		// Retired nodes are history, not scrape targets.
+		nodes = slices.DeleteFunc(nodes, func(n store.NodeStatus) bool { return n.Retired })
 
 		counters, err := st.Counters(r.Context(), sc)
 		if err != nil {
