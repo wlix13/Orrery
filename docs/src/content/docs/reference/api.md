@@ -76,7 +76,7 @@ Parameters: `range`, `fleet`.
 ```json
 {
   "generated_at": 1721740800,
-  "nodes": {"total": 12, "up": 11, "stale": 0, "down": 0, "off": 1},
+  "nodes": {"total": 12, "up": 11, "stale": 0, "down": 0, "off": 1, "retired": 2},
   "online_users": 34,
   "totals": {"up_bytes": 128374, "down_bytes": 9182736},
   "fleets": [{"fleet": "main", "nodes_up": 11, "nodes_total": 12, "up_bytes": 1, "down_bytes": 2}],
@@ -87,10 +87,11 @@ Parameters: `range`, `fleet`.
 
 `fleets` is sorted by name.
 `top_users` (hubs only) and `top_nodes` (inbound traffic) hold at most ten entries each.
+`nodes.retired` counts nodes dropped from the config and is outside `total` and the per-fleet counts.
 
 ### `GET /api/nodes`
 
-Every node in scope.
+Every node in scope, including retired ones.
 Parameters: `fleet`.
 
 ```json
@@ -115,6 +116,7 @@ The `uptime_s`, `num_goroutine`, `alloc_bytes`, `sys_bytes` and `num_gc` fields 
 | `stale` | Under 5 intervals. |
 | `down` | Older than that, or never polled successfully. |
 | `off` | `collect: off`. Never polled. |
+| `retired` | No longer in the config. Its history stays readable, it is never polled again, and it is absent from `/metrics`. |
 
 ### `GET /api/nodes/{fleet}/{id}`
 
