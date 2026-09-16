@@ -3,7 +3,6 @@ title: Architecture
 description: How the collector, storage and dashboard fit together.
 ---
 
-
 Metrics collection and visualization for the **Conglomerate** proxy fleet.
 
 ## Goals
@@ -104,6 +103,7 @@ online_current      node_key, email, ip, last_seen (snapshot per poll)
 
 Node status is derived at request time rather than stored: `up` if the last successful poll is under 2× the poll interval old, `stale` under 5×, else `down`.
 A node with `collect: off` reports `off` instead.
+A node dropped from the config keeps its row and history and reports `retired`; listing it again un-retires it.
 
 ### Configuration (`orrery.yaml`)
 

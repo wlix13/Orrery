@@ -5,7 +5,7 @@ export type Range = "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 /** Lookback for hubs-seen (presence/activity), independent of traffic range. */
 export type SeenWindow = "1h" | "6h" | "24h";
 
-export type NodeStatus = "up" | "stale" | "down" | "off";
+export type NodeStatus = "up" | "stale" | "down" | "off" | "retired";
 export type NodeType = "hub" | "exit";
 export type CollectLevel = "full" | "traffic" | "off";
 export type Direction = "up" | "down";
@@ -71,6 +71,7 @@ export interface Overview {
     stale: number;
     down: number;
     off: number; // intentionally disabled (collect: off) - not an alarm
+    retired: number; // dropped from config, kept for history, outside total
   };
   online_users: number;
   totals: {

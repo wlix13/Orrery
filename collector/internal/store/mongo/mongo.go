@@ -181,6 +181,7 @@ type nodeDoc struct {
 	AllocBytes   int64  `bson:"alloc_bytes"`
 	SysBytes     int64  `bson:"sys_bytes"`
 	NumGC        int64  `bson:"num_gc"`
+	Retired      bool   `bson:"retired"`
 }
 
 func (d nodeDoc) node() store.Node {
@@ -207,25 +208,33 @@ type onlineCurrentDoc struct {
 }
 
 // RegisterNodes reconciles the nodes collection with the configured set.
-// Upserts run first so newly configured nodes exist before pruning removes
-// rows for anything no longer in the set (nodes, online_current,
-// counters_last - traffic/online buckets are left in place but become
-// unreachable since every query scopes to registered nodes).
+// Listed nodes upsert, every other row flips to retired, online snapshots stay only for nodes polled at collect: full.
 func (s *Store) RegisterNodes(ctx context.Context, nodes []store.Node) error {
 	keys := make([]string, 0, len(nodes))
+	full := make([]string, 0, len(nodes))
 	models := make([]mongo.WriteModel, 0, len(nodes))
 
 	for _, n := range nodes {
 		keys = append(keys, n.Key)
 
+		if n.Collect == "full" {
+			full = append(full, n.Key)
+		}
+
 		set := bson.D{
 			{Key: "fleet", Value: n.Fleet}, {Key: "id", Value: n.ID}, {Key: "region", Value: n.Region},
 			{Key: "type", Value: n.Type}, {Key: "hostname", Value: n.Hostname}, {Key: "collect", Value: n.Collect},
+			{Key: "retired", Value: false},
 		}
 		models = append(models, mongo.NewUpdateOneModel().
 			SetFilter(bson.D{{Key: "_id", Value: n.Key}}).
 			SetUpdate(bson.D{{Key: "$set", Value: set}}).
 			SetUpsert(true))
+	}
+
+	// No transaction, so retire runs last: a failed call never leaves a retired node with a live poller.
+	if _, err := s.onlineCurrent.DeleteMany(ctx, bson.D{{Key: "node_key", Value: bson.D{{Key: "$nin", Value: full}}}}); err != nil {
+		return fmt.Errorf("prune online_current: %w", err)
 	}
 
 	if len(models) > 0 {
@@ -234,18 +243,10 @@ func (s *Store) RegisterNodes(ctx context.Context, nodes []store.Node) error {
 		}
 	}
 
-	notIn := bson.D{{Key: "$nin", Value: keys}}
-
-	if _, err := s.nodes.DeleteMany(ctx, bson.D{{Key: "_id", Value: notIn}}); err != nil {
-		return fmt.Errorf("prune nodes: %w", err)
-	}
-
-	if _, err := s.onlineCurrent.DeleteMany(ctx, bson.D{{Key: "node_key", Value: notIn}}); err != nil {
-		return fmt.Errorf("prune online_current: %w", err)
-	}
-
-	if _, err := s.countersLast.DeleteMany(ctx, bson.D{{Key: "node_key", Value: notIn}}); err != nil {
-		return fmt.Errorf("prune counters_last: %w", err)
+	if _, err := s.nodes.UpdateMany(ctx,
+		bson.D{{Key: "_id", Value: bson.D{{Key: "$nin", Value: keys}}}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "retired", Value: true}}}}); err != nil {
+		return fmt.Errorf("retire nodes: %w", err)
 	}
 
 	return nil

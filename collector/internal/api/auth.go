@@ -59,7 +59,7 @@ func (s *Server) auth(next http.Handler) http.Handler {
 }
 
 func (s *Server) authenticate(r *http.Request) (Principal, bool) {
-	if s.cfg.Auth.AllowAnonymous {
+	if s.cfg.Load().Auth.AllowAnonymous {
 		return Principal{Name: methodAnonymous, Method: methodAnonymous, Scope: store.AllFleets()}, true
 	}
 
@@ -76,8 +76,9 @@ func (s *Server) authenticate(r *http.Request) (Principal, bool) {
 func (s *Server) tokenPrincipal(token string) (Principal, bool) {
 	var found *config.TokenConfig
 
-	for i := range s.cfg.Auth.Tokens {
-		t := &s.cfg.Auth.Tokens[i]
+	tokens := s.cfg.Load().Auth.Tokens
+	for i := range tokens {
+		t := &tokens[i]
 		if subtle.ConstantTimeCompare([]byte(token), []byte(t.Token)) == 1 {
 			found = t
 		}

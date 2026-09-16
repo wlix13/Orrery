@@ -182,7 +182,7 @@ export default function NodeDetail({ nodeKey }: { nodeKey: string }) {
           loading={detail.loading}
           value={
             detail.data
-              ? detail.data.status === "down" || detail.data.status === "off"
+              ? detail.data.status === "down" || detail.data.status === "off" || detail.data.status === "retired"
                 ? "—"
                 : formatDuration(detail.data.uptime_s)
               : undefined

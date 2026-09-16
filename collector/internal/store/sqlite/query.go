@@ -285,7 +285,7 @@ func (s *Store) NodeStatuses(ctx context.Context, scope Scope) ([]NodeStatus, er
 	}
 
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT node_key, fleet, id, region, type, hostname, collect,
+		SELECT node_key, fleet, id, region, type, hostname, collect, retired,
 		       last_ok, last_err, last_err_ts, uptime_s, num_goroutine, alloc_bytes, sys_bytes, num_gc
 		FROM nodes`+where+` ORDER BY fleet, id`, args...)
 	if err != nil {
@@ -298,7 +298,7 @@ func (s *Store) NodeStatuses(ctx context.Context, scope Scope) ([]NodeStatus, er
 
 	for rows.Next() {
 		var n NodeStatus
-		if err := rows.Scan(&n.Key, &n.Fleet, &n.ID, &n.Region, &n.Type, &n.Hostname, &n.Collect,
+		if err := rows.Scan(&n.Key, &n.Fleet, &n.ID, &n.Region, &n.Type, &n.Hostname, &n.Collect, &n.Retired,
 			&n.LastOK, &n.LastErr, &n.LastErrTS, &n.UptimeS, &n.NumGoroutine, &n.AllocBytes, &n.SysBytes, &n.NumGC); err != nil {
 			return nil, err
 		}
@@ -912,9 +912,10 @@ func (s *Store) Counters(ctx context.Context, scope Scope) ([]CounterRow, error)
 		return nil, nil
 	}
 
-	where := ""
+	// Retired nodes keep their delta base but are no scrape target.
+	where := " WHERE n.retired = 0"
 	if scoped != "" {
-		where = " WHERE " + scoped
+		where += " AND " + scoped
 	}
 
 	rows, err := s.db.QueryContext(ctx,

@@ -20,7 +20,7 @@ interface NodeWithSpark extends NodeRow {
   downBytes24h: number;
 }
 
-const STATUS_FILTERS: Array<NodeStatus | "all"> = ["all", "up", "stale", "down", "off"];
+const STATUS_FILTERS: Array<NodeStatus | "all"> = ["all", "up", "stale", "down", "off", "retired"];
 
 function typeRank(type: NodeType): number {
   return type === "hub" ? 0 : 1;
@@ -32,11 +32,11 @@ const STATUS_CHIP_CLASS: Record<NodeStatus, string> = {
   stale: "bg-stale/15 text-stale",
   down: "bg-down/15 text-down",
   off: "bg-off/25 text-text-muted",
+  retired: "bg-off/25 text-text-muted",
 };
 
 function parseStatus(raw: string | null): NodeStatus | "all" {
-  if (raw === "up" || raw === "stale" || raw === "down" || raw === "off") return raw;
-  return "all";
+  return STATUS_FILTERS.find((s) => s === raw) ?? "all";
 }
 
 export default function Nodes() {
@@ -116,7 +116,7 @@ export default function Nodes() {
                   className={`rounded px-1.5 py-0.5 text-[0.65rem] font-medium ${STATUS_CHIP_CLASS[r.status]}`}
                   title={STATUS_HELP[r.status]}
                 >
-                  {STATUS_LABEL[r.status].toLowerCase()}
+                  {(STATUS_LABEL[r.status] ?? r.status).toLowerCase()}
                 </span>
               )}
             </div>
@@ -139,7 +139,7 @@ export default function Nodes() {
       align: "right",
       numeric: true,
       sort: (a, b) => a.uptime_s - b.uptime_s,
-      render: (r) => (r.status === "down" || r.status === "off" ? "—" : formatDuration(r.uptime_s)),
+      render: (r) => (r.status === "down" || r.status === "off" || r.status === "retired" ? "—" : formatDuration(r.uptime_s)),
     },
     {
       key: "mem",

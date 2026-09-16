@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -32,7 +33,7 @@ func (s *Store) trafficColl(from int64) *mongo.Collection {
 // Mongo aggregation here avoids $lookup, every query that needs to filter
 // by fleet/type or hide unregistered nodes' data does it against this map
 // instead. The collection is expected to stay small (one row per node).
-func (s *Store) loadNodes(ctx context.Context) (map[string]store.Node, error) {
+func (s *Store) loadNodes(ctx context.Context) (map[string]nodeDoc, error) {
 	cur, err := s.nodes.Find(ctx, bson.D{})
 	if err != nil {
 		return nil, err
@@ -40,7 +41,7 @@ func (s *Store) loadNodes(ctx context.Context) (map[string]store.Node, error) {
 
 	defer func() { _ = cur.Close(ctx) }()
 
-	out := map[string]store.Node{}
+	out := map[string]nodeDoc{}
 
 	for cur.Next(ctx) {
 		var doc nodeDoc
@@ -48,7 +49,7 @@ func (s *Store) loadNodes(ctx context.Context) (map[string]store.Node, error) {
 			return nil, err
 		}
 
-		out[doc.Key] = doc.node()
+		out[doc.Key] = doc
 	}
 
 	return out, cur.Err()
@@ -56,7 +57,7 @@ func (s *Store) loadNodes(ctx context.Context) (map[string]store.Node, error) {
 
 // filterNodeKeys returns the node keys inside scope matching the given
 // type/node filters (empty string = no filter on that dimension).
-func filterNodeKeys(nodes map[string]store.Node, scope store.Scope, typ, node string) []string {
+func filterNodeKeys(nodes map[string]nodeDoc, scope store.Scope, typ, node string) []string {
 	keys := make([]string, 0, len(nodes))
 
 	for k, n := range nodes {
@@ -150,7 +151,7 @@ func (s *Store) NodeStatuses(ctx context.Context, scope store.Scope) ([]store.No
 		out = append(out, store.NodeStatus{
 			Node: doc.node(), LastErr: doc.LastErr, LastOK: doc.LastOK, LastErrTS: doc.LastErrTS,
 			UptimeS: doc.UptimeS, NumGoroutine: doc.NumGoroutine,
-			AllocBytes: doc.AllocBytes, SysBytes: doc.SysBytes, NumGC: doc.NumGC,
+			AllocBytes: doc.AllocBytes, SysBytes: doc.SysBytes, NumGC: doc.NumGC, Retired: doc.Retired,
 		})
 	}
 
@@ -536,7 +537,7 @@ type nodeDirRow struct {
 
 // fleetTotals sums hub-inbound traffic per fleet and overall.
 func (s *Store) fleetTotals(
-	ctx context.Context, coll *mongo.Collection, nodes map[string]store.Node, hubKeys []string, from, to int64,
+	ctx context.Context, coll *mongo.Collection, nodes map[string]nodeDoc, hubKeys []string, from, to int64,
 ) (store.DirTotal, map[string]store.DirTotal, error) {
 	var totals store.DirTotal
 
@@ -768,7 +769,7 @@ type hubSeenRow struct {
 }
 
 func (s *Store) hubsSeen(
-	ctx context.Context, nodes map[string]store.Node, seenFrom, to int64, scope store.Scope, emailFilter string,
+	ctx context.Context, nodes map[string]nodeDoc, seenFrom, to int64, scope store.Scope, emailFilter string,
 ) (map[string][]store.UserHubSeen, error) {
 	hubKeys := filterNodeKeys(nodes, scope, "hub", "")
 	if len(hubKeys) == 0 {
@@ -1075,7 +1076,8 @@ func (s *Store) Counters(ctx context.Context, scope store.Scope) ([]store.Counte
 		return nil, err
 	}
 
-	allowed := filterNodeKeys(nodes, scope, "", "")
+	// Retired nodes keep their delta base but are no scrape target.
+	allowed := slices.DeleteFunc(filterNodeKeys(nodes, scope, "", ""), func(k string) bool { return nodes[k].Retired })
 	if len(allowed) == 0 {
 		return nil, nil
 	}

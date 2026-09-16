@@ -4,6 +4,7 @@ package poller
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"math/rand/v2"
 	"net"
@@ -163,7 +164,12 @@ func pollReason(err error) string {
 }
 
 // fail logs the error and stores only the label, which the API serves.
+// Cancelled poll means this poller is stopping, not node failure.
 func (p *Poller) fail(ctx context.Context, err error, reason string) {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return
+	}
+
 	p.log.Warn("poll failed", "reason", reason, "err", err)
 	// Best-effort: the parent ctx may already be cancelled on shutdown.
 	if mErr := p.store.MarkNodeError(context.WithoutCancel(ctx), p.target.Node.Key, reason, time.Now()); mErr != nil {

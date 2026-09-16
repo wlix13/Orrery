@@ -6,6 +6,7 @@ const STATUS_COLOR_CLASS: Record<NodeStatus, string> = {
   stale: "bg-stale",
   down: "bg-down",
   off: "bg-off",
+  retired: "bg-off",
 };
 
 interface StatusDotProps {

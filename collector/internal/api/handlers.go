@@ -55,6 +55,10 @@ func parseSeen(r *http.Request, to int64) (seenFrom int64, ok bool) {
 
 // nodeStatus derives the health label used across the API and /metrics.
 func (s *Server) nodeStatus(n store.NodeStatus) string {
+	if n.Retired {
+		return "retired"
+	}
+
 	if n.Collect == "off" {
 		return "off"
 	}
@@ -64,7 +68,7 @@ func (s *Server) nodeStatus(n store.NodeStatus) string {
 	}
 
 	age := time.Since(time.Unix(n.LastOK, 0))
-	interval := s.cfg.Poll.Interval.D()
+	interval := s.cfg.Load().Poll.Interval.D()
 
 	switch {
 	case age < 2*interval:
@@ -136,6 +140,11 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		st := s.nodeStatus(n)
 		counts[st]++
 
+		// Retired nodes are history, not fleet members.
+		if st == "retired" {
+			continue
+		}
+
 		fa, ok := fleetNodes[n.Fleet]
 		if !ok {
 			fa = &fleetAgg{}
@@ -182,11 +191,13 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"generated_at": time.Now().Unix(),
 		"nodes": map[string]int{
-			"total": len(statuses), "up": counts["up"],
+			"total": len(statuses) - counts["retired"], "up": counts["up"],
 			"stale": counts["stale"], "down": counts["down"],
 			// Intentionally-disabled nodes (collect: off) are a calm state,
 			// kept out of the "down" alarm count.
 			"off": counts["off"],
+			// Dropped from config, kept for history, outside total.
+			"retired": counts["retired"],
 		},
 		"online_users": traffic.OnlineUsers,
 		"totals":       map[string]int64{"up_bytes": traffic.Totals.Up, "down_bytes": traffic.Totals.Down},

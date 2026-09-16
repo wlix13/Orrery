@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/wlix13/orrery/collector/internal/config"
@@ -15,13 +16,14 @@ import (
 
 type Server struct {
 	store   store.Store
-	cfg     *config.Config
+	cfg     *atomic.Pointer[config.Config]
 	log     *slog.Logger
 	startAt time.Time
 	version string
 }
 
-func New(st store.Store, cfg *config.Config, version string, log *slog.Logger) *Server {
+// New reads config through cfg on every request, so reloads apply at once. Routes are wired once, from config at start.
+func New(st store.Store, cfg *atomic.Pointer[config.Config], version string, log *slog.Logger) *Server {
 	return &Server{store: st, cfg: cfg, log: log, startAt: time.Now(), version: version}
 }
 
@@ -48,7 +50,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/", s.auth(api))
 
 	// Same auth as /api: metrics expose per-node and per-user traffic volumes.
-	if s.cfg.Metrics.Enabled {
+	if s.cfg.Load().Metrics.Enabled {
 		mux.Handle("GET /metrics", s.auth(promexp.Handler(s.store, s.log, s.nodeStatus, func(r *http.Request) store.Scope {
 			return principalOf(r.Context()).Scope
 		})))
@@ -61,11 +63,12 @@ func (s *Server) Handler() http.Handler {
 
 // rootHandler serves the dashboard, or a JSON 404 when there isn't one.
 func (s *Server) rootHandler() http.Handler {
+	cfg := s.cfg.Load()
 	switch {
-	case !s.cfg.DashboardRequested():
+	case !cfg.DashboardRequested():
 		return notFound()
 	case !DashboardEmbedded:
-		if s.cfg.DashboardExplicitlyEnabled() {
+		if cfg.DashboardExplicitlyEnabled() {
 			s.log.Warn("dashboard.enabled is set but this binary was built without the dashboard (-tags nodashboard)")
 		}
 

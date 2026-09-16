@@ -48,7 +48,10 @@ func Open(path string) (*Store, error) {
 }
 
 // migrations is schema history, one step per version, applied by Open past user_version. Append only, never edit shipped steps.
-var migrations = []string{schema}
+var migrations = []string{
+	schema,
+	"ALTER TABLE nodes ADD COLUMN retired INTEGER NOT NULL DEFAULT 0",
+}
 
 func migrate(db *sql.DB) error {
 	var version int
@@ -187,11 +190,11 @@ func (s *Store) RegisterNodes(ctx context.Context, nodes []Node) error {
 		keys = append(keys, n.Key)
 
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO nodes (node_key, fleet, id, region, type, hostname, collect)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO nodes (node_key, fleet, id, region, type, hostname, collect, retired)
+			VALUES (?, ?, ?, ?, ?, ?, ?, 0)
 			ON CONFLICT(node_key) DO UPDATE SET
 			  fleet=excluded.fleet, id=excluded.id, region=excluded.region,
-			  type=excluded.type, hostname=excluded.hostname, collect=excluded.collect`,
+			  type=excluded.type, hostname=excluded.hostname, collect=excluded.collect, retired=0`,
 			n.Key, n.Fleet, n.ID, n.Region, n.Type, n.Hostname, n.Collect); err != nil {
 			return err
 		}
@@ -204,14 +207,14 @@ func (s *Store) RegisterNodes(ctx context.Context, nodes []Node) error {
 		args[i] = k
 	}
 
-	for _, q := range []string{
-		"DELETE FROM nodes WHERE node_key NOT IN (" + placeholders + ")",
-		"DELETE FROM online_current WHERE node_key NOT IN (" + placeholders + ")",
-		"DELETE FROM counters_last WHERE node_key NOT IN (" + placeholders + ")",
-	} {
-		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
-			return err
-		}
+	if _, err := tx.ExecContext(ctx, "UPDATE nodes SET retired=1 WHERE node_key NOT IN ("+placeholders+")", args...); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM online_current
+		WHERE node_key NOT IN (SELECT node_key FROM nodes WHERE retired=0 AND collect='full')`); err != nil {
+		return err
 	}
 
 	return tx.Commit()
