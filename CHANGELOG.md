@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/wlix13/Orrery/compare/v0.2.0...v0.3.0) (2026-09-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **collector:** keep removed nodes as retired instead of pruning them
+
+### Features
+
+* **collector:** keep removed nodes as retired instead of pruning them ([98c8374](https://github.com/wlix13/Orrery/commit/98c8374da31e1660772cbc8c24b42d2efdc93a00))
+* **collector:** reload config on SIGHUP and file change ([a1ab78f](https://github.com/wlix13/Orrery/commit/a1ab78fccb5b61cf141f3bc7ac1b368aee7e79fa))
+* **collector:** report retired nodes in API and skip them in /metrics ([baf4c68](https://github.com/wlix13/Orrery/commit/baf4c68e7b1cfb19e01a31fc4e8874b7a57f4013))
+* **collector:** version the SQLite schema and migrate it on open ([1ba7446](https://github.com/wlix13/Orrery/commit/1ba744680b912ff55a055b14319237e63b9fed2e))
+* **dashboard:** show retired nodes ([c7db000](https://github.com/wlix13/Orrery/commit/c7db000a7debf01e8767b80b4322f25c1164a936))
+
 ## [0.2.0](https://github.com/wlix13/Orrery/compare/v0.1.2...v0.2.0) (2026-08-08)
 
 
