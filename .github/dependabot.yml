@@ -4,7 +4,8 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: "cron"
+      cronjob: "0 6 1,15 * *" # twice a month, closest dependabot gets to every two weeks
     commit-message:
       prefix: chore
       include: scope
@@ -15,7 +16,8 @@ updates:
   - package-ecosystem: gomod
     directory: /collector
     schedule:
-      interval: weekly
+      interval: "cron"
+      cronjob: "0 6 1,15 * *" # twice a month, closest dependabot gets to every two weeks
     commit-message:
       prefix: chore
       include: scope
@@ -26,7 +28,8 @@ updates:
   - package-ecosystem: npm
     directory: /dashboard
     schedule:
-      interval: weekly
+      interval: "cron"
+      cronjob: "0 6 1,15 * *" # twice a month, closest dependabot gets to every two weeks
     cooldown:
       default-days: 3
       semver-major-days: 7
@@ -40,7 +43,8 @@ updates:
   - package-ecosystem: npm
     directory: /dashboard/worker
     schedule:
-      interval: weekly
+      interval: "cron"
+      cronjob: "0 6 1,15 * *" # twice a month, closest dependabot gets to every two weeks
     cooldown:
       default-days: 3
       semver-major-days: 7
@@ -54,7 +58,8 @@ updates:
   - package-ecosystem: npm
     directory: /docs
     schedule:
-      interval: weekly
+      interval: "cron"
+      cronjob: "0 6 1,15 * *" # twice a month, closest dependabot gets to every two weeks
     cooldown:
       default-days: 3
       semver-major-days: 7

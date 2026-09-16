@@ -70,7 +70,7 @@ func TestKeyMatchesSSHFP(t *testing.T) {
 	good := &dns.SSHFP{Algorithm: sshfpAlgEd25519, Type: sshfpTypeSHA256, FingerPrint: fp}
 	// SSHFP records store hex uppercase or lowercase; matching is case-insensitive.
 	upper := &dns.SSHFP{Algorithm: sshfpAlgEd25519, Type: sshfpTypeSHA256, FingerPrint: hexUpper(fp)}
-	wrongFP := &dns.SSHFP{Algorithm: sshfpAlgEd25519, Type: sshfpTypeSHA256, FingerPrint: "00" + fp[2:]}
+	wrongFP := &dns.SSHFP{Algorithm: sshfpAlgEd25519, Type: sshfpTypeSHA256, FingerPrint: sshfpFingerprint(sshfpTypeSHA256, []byte("another key"))}
 	wrongAlg := &dns.SSHFP{Algorithm: sshfpAlgRSA, Type: sshfpTypeSHA256, FingerPrint: fp}
 
 	tests := []struct {
